@@ -23,6 +23,54 @@
         width: 100vw;
         height: 100vh;
       }
+      
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      
+      /* Horizontal scrolling for transaction type rows */
+      .horizontal-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255,255,255,0.3) transparent;
+      }
+      
+      .horizontal-scroll::-webkit-scrollbar {
+        height: 8px;
+      }
+      
+      .horizontal-scroll::-webkit-scrollbar-track {
+        background: rgba(255,255,255,0.1);
+        border-radius: 4px;
+      }
+      
+      .horizontal-scroll::-webkit-scrollbar-thumb {
+        background: rgba(255,255,255,0.3);
+        border-radius: 4px;
+      }
+      
+      .horizontal-scroll::-webkit-scrollbar-thumb:hover {
+        background: rgba(255,255,255,0.5);
+      }
+      
+      /* Custom scrollbar for horizontal scrolling */
+      .horizontal-scroll::-webkit-scrollbar {
+        height: 8px;
+      }
+      
+      .horizontal-scroll::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+      }
+      
+      .horizontal-scroll::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 4px;
+      }
+      
+      .horizontal-scroll::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.5);
+      }
     </style>
   </head>
   <body>

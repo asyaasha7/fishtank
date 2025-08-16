@@ -88,11 +88,17 @@ function Home() {
     try {
       if (isInitialLoad) {
         setLoading(true)
-        console.log(`🎲 Loading initial transactions for 3D cube visualization from ${selectedChain}...`)
+        console.log(`🎲 Loading initial transactions for 3D cube visualization from ${selectedChain.toUpperCase()}...`)
         const transactions = await fetchAndAnalyzeTransactions(12, selectedChain)
         const characterList = transactions.map(transactionToCharacter)
         setCharacters(characterList)
-        console.log(`✅ Loaded ${characterList.length} initial transaction cubes from ${selectedChain}`)
+        
+        // Check data source for better user feedback
+        const dataSource = transactions[0]?.id?.includes('katana_') 
+          ? (transactions[0]?.id?.includes('katana_0x') ? 'Real Katana RPC' : 'Katana Simulation')
+          : (transactions[0]?.id?.includes('etherscan') ? 'Etherscan API' : 'Ethereum Simulation')
+        
+        console.log(`✅ Loaded ${characterList.length} initial transaction cubes from ${selectedChain.toUpperCase()} (${dataSource})`)
       } else {
         // Smooth refresh - fetch new transactions and add to existing array
         console.log(`🔄 Fetching new transactions from ${selectedChain} for smooth update...`)
@@ -197,7 +203,7 @@ function Home() {
       <div style={{ 
         position: 'absolute', 
         top: '70px', 
-        right: '20px', 
+        left: '20px', 
         width: '349px',
         zIndex: 100,
         background: 'rgba(0,0,0,0.8)',

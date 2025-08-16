@@ -58,7 +58,7 @@ function Navigation() {
     <nav style={navStyle}>
       <div style={navContainerStyle}>
         <Link to="/" style={logoStyle}>
-          React Three.js App
+        The Fishtank: MEV Hunter
         </Link>
         
         <ul style={navLinksStyle}>
@@ -77,7 +77,7 @@ function Navigation() {
                 }
               }}
             >
-              3D Scene
+              Play
             </Link>
           </li>
           <li>

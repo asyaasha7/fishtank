@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import GLTFCharacter from './GLTFCharacter'
 
 // Game state and utilities
 let gameState = {
@@ -335,173 +336,9 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
   )
 }
 
-// Enhanced flying sphere with collision detection
-const GameSphere = React.memo(({ mousePos, sphereRef, isShieldActive }) => {
-  const propellerRef = useRef()
-  
-  useFrame((state, delta) => {
-    if (sphereRef.current && mousePos) {
-      // Convert mouse position to target coordinates
-      const targetY = normalize(mousePos.y, -0.75, 0.75, -3, 3);
-      const targetX = normalize(mousePos.x, -0.75, 0.75, -2, 2);
-      
-      // Smooth movement toward target position
-      sphereRef.current.position.y += (targetY - sphereRef.current.position.y) * 0.1;
-      sphereRef.current.position.x += (targetX - sphereRef.current.position.x) * 0.05;
-      
-      // Rotate the sphere proportionally to movement for realistic flight
-      sphereRef.current.rotation.z = (targetY - sphereRef.current.position.y) * 0.1;
-      sphereRef.current.rotation.x = (sphereRef.current.position.y - targetY) * 0.05;
-    }
-    
-    // Rotate the propeller continuously
-    if (propellerRef.current) {
-      propellerRef.current.rotation.x += delta * 10;
-    }
-  })
 
-  return (
-    <group ref={sphereRef} position={[-3, 0, 2]}>
-      {/* Main sphere body - now glowing to show it's the player */}
-      <mesh castShadow receiveShadow>
-        <sphereGeometry args={[0.4, 16, 16]} />
-        <meshPhongMaterial 
-          color="#00b894" 
-          shininess={100}
-          emissive="#00b894"
-          emissiveIntensity={0.3}
-        />
-      </mesh>
-      
-      {/* Glowing ring around sphere to show it's special */}
-      <mesh>
-        <torusGeometry args={[0.6, 0.1, 8, 16]} />
-        <meshBasicMaterial 
-          color="#74b9ff" 
-          transparent={true}
-          opacity={0.6}
-        />
-      </mesh>
-      
-      {/* Wing attachments */}
-      <mesh position={[0, 0, 0.5]} castShadow receiveShadow>
-        <boxGeometry args={[0.8, 0.1, 0.1]} />
-        <meshPhongMaterial color="#00a085" />
-      </mesh>
-      
-      <mesh position={[0, 0, -0.5]} castShadow receiveShadow>
-        <boxGeometry args={[0.8, 0.1, 0.1]} />
-        <meshPhongMaterial color="#00a085" />
-      </mesh>
-      
-      {/* Front propeller */}
-      <group ref={propellerRef} position={[0.5, 0, 0]}>
-        <mesh castShadow receiveShadow>
-          <cylinderGeometry args={[0.06, 0.06, 0.1, 8]} />
-          <meshPhongMaterial color="#2d3436" />
-        </mesh>
-        
-        {/* Propeller blades */}
-        <mesh rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
-          <boxGeometry args={[0.02, 0.8, 0.05]} />
-          <meshPhongMaterial color="#636e72" />
-        </mesh>
-        <mesh rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
-          <boxGeometry args={[0.02, 0.8, 0.05]} />
-          <meshPhongMaterial color="#636e72" />
-        </mesh>
-      </group>
-      
-      {/* Enhanced trail effect */}
-      <mesh position={[-0.6, 0, 0]}>
-        <sphereGeometry args={[0.15, 8, 8]} />
-        <meshBasicMaterial 
-          color="#74b9ff" 
-          transparent={true} 
-          opacity={0.8}
-        />
-      </mesh>
-      
-      <mesh position={[-0.9, 0, 0]}>
-        <sphereGeometry args={[0.1, 8, 8]} />
-        <meshBasicMaterial 
-          color="#0984e3" 
-          transparent={true} 
-          opacity={0.6}
-        />
-      </mesh>
-      
-      {/* Enhanced Shield Effect */}
-      {isShieldActive && (
-        <ShieldEffect />
-      )}
-    </group>
-  )
-})
 
-// Shield Effect Component with glowing, blinking animation
-function ShieldEffect() {
-  const shieldRef = useRef()
-  const outerShieldRef = useRef()
-  
-  useFrame((state) => {
-    if (shieldRef.current && outerShieldRef.current) {
-      const time = state.clock.getElapsedTime()
-      
-      // Pulsing opacity effect
-      const pulseOpacity = 0.2 + Math.sin(time * 3) * 0.15 // Oscillates between 0.05 and 0.35
-      const outerPulseOpacity = 0.1 + Math.sin(time * 2) * 0.08 // Oscillates between 0.02 and 0.18
-      
-      // Rotating effect
-      shieldRef.current.rotation.y += 0.01
-      outerShieldRef.current.rotation.y -= 0.008
-      shieldRef.current.rotation.x += 0.005
-      
-      // Update materials opacity
-      shieldRef.current.material.opacity = pulseOpacity
-      outerShieldRef.current.material.opacity = outerPulseOpacity
-      
-      // Slight scaling effect for breathing
-      const scale = 1 + Math.sin(time * 2.5) * 0.05
-      shieldRef.current.scale.setScalar(scale)
-      outerShieldRef.current.scale.setScalar(scale * 1.1)
-    }
-  })
-  
-  return (
-    <group>
-      {/* Inner shield - wireframe */}
-      <mesh ref={shieldRef} position={[0, 0, 0]}>
-        <sphereGeometry args={[0.9, 16, 16]} />
-        <meshBasicMaterial 
-          color="#00ffff" 
-          transparent={true} 
-          opacity={0.3}
-          wireframe={true}
-        />
-      </mesh>
-      
-      {/* Outer shield - solid with glow */}
-      <mesh ref={outerShieldRef} position={[0, 0, 0]}>
-        <sphereGeometry args={[1.0, 12, 12]} />
-        <meshBasicMaterial 
-          color="#40e0d0" 
-          transparent={true} 
-          opacity={0.15}
-          wireframe={false}
-        />
-      </mesh>
-      
-      {/* Glowing particles effect */}
-      <pointLight 
-        position={[0, 0, 0]} 
-        intensity={0.3} 
-        color="#00ffff" 
-        distance={3}
-      />
-    </group>
-  )
-}
+
 
 // Game cubes manager component
 function GameCubes({ characters, sphereRef, onCubeCollected, isShieldActive }) {
@@ -712,8 +549,8 @@ function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealth
       <pointLight position={[8, 0, 0]} intensity={0.4} color="#00b894" />
       
       {/* Game objects */}
-      <GameSphere mousePos={mousePos} sphereRef={sphereRef} isShieldActive={isShieldActive} />
-      <GameCubes 
+      <GLTFCharacter mousePos={mousePos} sphereRef={sphereRef} isShieldActive={isShieldActive} />
+      <GameCubes
         characters={characters} 
         sphereRef={sphereRef}
         onCubeCollected={handleCubeCollected}

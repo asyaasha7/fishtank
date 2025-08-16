@@ -37,6 +37,7 @@ function Home() {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
   const [refreshCountdown, setRefreshCountdown] = useState(10)
   const [isAutoRefreshing, setIsAutoRefreshing] = useState(false)
+  const [selectedChain, setSelectedChain] = useState('ethereum')
 
   useEffect(() => {
     loadTransactions(true) // Initial load
@@ -72,21 +73,30 @@ function Home() {
       clearInterval(refreshInterval);
       clearInterval(countdownInterval);
     };
-  }, [])
+  }, [selectedChain]) // Reload when chain changes
+
+  const handleChainSwitch = (newChain) => {
+    if (newChain !== selectedChain) {
+      console.log(`🔄 Switching from ${selectedChain} to ${newChain}`)
+      setSelectedChain(newChain)
+      setRefreshCountdown(10) // Reset countdown
+      // The useEffect will trigger a reload automatically
+    }
+  }
 
   const loadTransactions = async (isInitialLoad = false) => {
     try {
       if (isInitialLoad) {
         setLoading(true)
-        console.log('🎲 Loading initial transactions for 3D cube visualization...')
-        const transactions = await fetchAndAnalyzeTransactions(12)
+        console.log(`🎲 Loading initial transactions for 3D cube visualization from ${selectedChain}...`)
+        const transactions = await fetchAndAnalyzeTransactions(12, selectedChain)
         const characterList = transactions.map(transactionToCharacter)
         setCharacters(characterList)
-        console.log(`✅ Loaded ${characterList.length} initial transaction cubes`)
+        console.log(`✅ Loaded ${characterList.length} initial transaction cubes from ${selectedChain}`)
       } else {
         // Smooth refresh - fetch new transactions and add to existing array
-        console.log('🔄 Fetching new transactions for smooth update...')
-        const newTransactions = await fetchAndAnalyzeTransactions(6) // Fetch fewer for updates
+        console.log(`🔄 Fetching new transactions from ${selectedChain} for smooth update...`)
+        const newTransactions = await fetchAndAnalyzeTransactions(6, selectedChain) // Fetch fewer for updates
         const newCharacterList = newTransactions.map(transactionToCharacter)
         
         setCharacters(prevCharacters => {
@@ -124,16 +134,18 @@ function Home() {
     }}>
       <div style={{ 
         position: 'absolute', 
-        top: '80px', 
+        top: '180px', 
+        gap: '20px',
         left: '20px', 
+        width: '349px',
+        display: 'flex',
         zIndex: 100,
         background: 'rgba(0,0,0,0.7)',
-        padding: '15px',
+        padding: '10px',
         borderRadius: '8px'
       }}>
         {loading && (
           <div style={{ 
-            marginTop: '10px',
             fontSize: '12px',
             opacity: 0.7,
             color: '#74b9ff'
@@ -143,7 +155,6 @@ function Home() {
         )}
         {!loading && (
           <div style={{ 
-            marginTop: '10px',
             fontSize: '12px',
             opacity: 0.7,
             color: '#00b894'
@@ -154,7 +165,6 @@ function Home() {
         
         {/* Auto-refresh status */}
         <div style={{ 
-          marginTop: '10px',
           fontSize: '11px',
           opacity: 0.6,
           color: isAutoRefreshing ? '#fdcb6e' : '#74b9ff',
@@ -180,6 +190,109 @@ function Home() {
               Next batch in {refreshCountdown}s
             </>
           )}
+        </div>
+      </div>
+      
+      {/* Chain Switching Panel */}
+      <div style={{ 
+        position: 'absolute', 
+        top: '70px', 
+        right: '20px', 
+        width: '349px',
+        zIndex: 100,
+        background: 'rgba(0,0,0,0.8)',
+        padding: '10px',
+        borderRadius: '8px',
+        border: '1px solid rgba(255,255,255,0.2)'
+      }}>
+        <div style={{ 
+          color: 'white', 
+          fontSize: '14px', 
+          fontWeight: 'bold', 
+          marginBottom: '10px',
+          textAlign: 'center'
+        }}>
+          🔗 Blockchain Network
+        </div>
+        
+        <div style={{ display: 'flex', gap: '8px', flexDirection: 'row', justifyContent: 'center' }}>
+          {/* Ethereum Button */}
+          <button
+            onClick={() => handleChainSwitch('ethereum')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: selectedChain === 'ethereum' ? '2px solid #74b9ff' : '1px solid rgba(255,255,255,0.3)',
+              background: selectedChain === 'ethereum' ? 'rgba(116, 185, 255, 0.2)' : 'rgba(255,255,255,0.1)',
+              color: selectedChain === 'ethereum' ? '#74b9ff' : '#ffffff',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px'
+            }}
+            onMouseEnter={(e) => {
+              if (selectedChain !== 'ethereum') {
+                e.target.style.background = 'rgba(255,255,255,0.2)'
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (selectedChain !== 'ethereum') {
+                e.target.style.background = 'rgba(255,255,255,0.1)'
+              }
+            }}
+          >
+            <span style={{ fontSize: '14px' }}>⟠</span>
+            Ethereum
+            {selectedChain === 'ethereum' && <span style={{ fontSize: '10px' }}>✓</span>}
+          </button>
+          
+          {/* Katana Button */}
+          <button
+            onClick={() => handleChainSwitch('katana')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: selectedChain === 'katana' ? '2px solid #a29bfe' : '1px solid rgba(255,255,255,0.3)',
+              background: selectedChain === 'katana' ? 'rgba(162, 155, 254, 0.2)' : 'rgba(255,255,255,0.1)',
+              color: selectedChain === 'katana' ? '#a29bfe' : '#ffffff',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px'
+            }}
+            onMouseEnter={(e) => {
+              if (selectedChain !== 'katana') {
+                e.target.style.background = 'rgba(255,255,255,0.2)'
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (selectedChain !== 'katana') {
+                e.target.style.background = 'rgba(255,255,255,0.1)'
+              }
+            }}
+          >
+            <span style={{ fontSize: '14px' }}>🗡️</span>
+            Katana
+            {selectedChain === 'katana' && <span style={{ fontSize: '10px' }}>✓</span>}
+          </button>
+        </div>
+        
+        <div style={{ 
+          fontSize: '10px', 
+          opacity: 0.6, 
+          color: '#ffffff',
+          marginTop: '8px',
+          textAlign: 'center'
+        }}>
+          {selectedChain === 'ethereum' ? 'Mainnet transactions' : 'Gaming ecosystem'}
         </div>
       </div>
       

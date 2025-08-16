@@ -3,36 +3,71 @@
 
 import { scoreRisk } from '../utils/riskScoring.js';
 
-// Ethereum API configuration with Etherscan V2 API key from environment
+// Multi-chain API configuration
 const ETHERSCAN_API_KEY = import.meta.env.VITE_ETHERSCAN_API_KEY;
-const ETHEREUM_APIS = {
-  // Etherscan V2 API - primary data source with unified API key for 50+ chains
-  etherscan_v2: 'https://api.etherscan.io/v2/api',
-  // Legacy Etherscan V1 API - backup
-  etherscan: 'https://api.etherscan.io/api',
-  // Blockchair API - backup, no key required
-  blockchair: 'https://api.blockchair.com/ethereum',
-  // Blockscout API - secondary backup
-  blockscout: 'https://eth.blockscout.com/api'
+
+// Chain configurations
+const CHAIN_CONFIGS = {
+  ethereum: {
+    chainId: 1,
+    name: 'Ethereum',
+    symbol: 'ETH',
+    apis: {
+      etherscan_v2: 'https://api.etherscan.io/v2/api',
+      etherscan: 'https://api.etherscan.io/api',
+      blockchair: 'https://api.blockchair.com/ethereum',
+      blockscout: 'https://eth.blockscout.com/api'
+    },
+    popularAddresses: [
+      '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D', // Uniswap V2 Router
+      '0xE592427A0AEce92De3Edee1F18E0157C05861564', // Uniswap V3 Router
+      '0xdAC17F958D2ee523a2206206994597C13D831ec7', // USDT Contract
+      '0xA0b86a33E6B6F8a8C3b5E8f8b6E8f8f8A8c3b5e8', // Compound
+      '0x6B175474E89094C44Da98b954EedeAC495271d0F', // DAI Contract
+      '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984', // UNI Token
+      '0x514910771AF9Ca656af840dff83E8264EcF986CA', // LINK Token
+    ]
+  },
+  katana: {
+    chainId: 1001, // Katana testnet chain ID (adjust if needed)
+    name: 'Katana',
+    symbol: 'ETH',
+    apis: {
+      // For now, we'll simulate Katana transactions
+      // In a real implementation, you'd have Katana-specific endpoints
+      katana_explorer: 'https://explorer.katana.ronin.network/api',
+      // Fallback to simulated data for Katana
+      simulation: true
+    },
+    popularAddresses: [
+      '0x0000000000000000000000000000000000000001', // Katana system contract
+      '0x0000000000000000000000000000000000000002', // Katana bridge
+      '0x0000000000000000000000000000000000000003', // Katana DEX
+    ]
+  }
 };
 
-// Popular addresses to fetch real transactions from
-const POPULAR_ADDRESSES = [
-  '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D', // Uniswap V2 Router
-  '0xE592427A0AEce92De3Edee1F18E0157C05861564', // Uniswap V3 Router
-  '0xdAC17F958D2ee523a2206206994597C13D831ec7', // USDT Contract
-  '0xA0b86a33E6B6F8a8C3b5E8f8b6E8f8f8A8c3b5e8', // Compound
-  '0x6B175474E89094C44Da98b954EedeAC495271d0F', // DAI Contract
-  '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984', // UNI Token
-  '0x514910771AF9Ca656af840dff83E8264EcF986CA', // LINK Token
-];
+// Backward compatibility
+const ETHEREUM_APIS = CHAIN_CONFIGS.ethereum.apis;
+const POPULAR_ADDRESSES = CHAIN_CONFIGS.ethereum.popularAddresses;
 
-export async function fetchRecentTransactions(address = null, count = 10) {
-  console.log('🔍 Starting transaction data fetch with Etherscan API...');
+// Multi-chain transaction fetching
+export async function fetchRecentTransactions(address = null, count = 10, chain = 'ethereum') {
+  const chainConfig = CHAIN_CONFIGS[chain];
+  if (!chainConfig) {
+    throw new Error(`Unsupported chain: ${chain}`);
+  }
+  
+  console.log(`🔍 Starting transaction data fetch for ${chainConfig.name}...`);
+  
+  // Handle Katana separately (simulation for now)
+  if (chain === 'katana') {
+    return fetchKatanaTransactions(count);
+  }
   
   try {
     // Try multiple approaches to get real data
-    const targetAddress = address || POPULAR_ADDRESSES[Math.floor(Math.random() * POPULAR_ADDRESSES.length)];
+    const targetAddress = address || chainConfig.popularAddresses[Math.floor(Math.random() * chainConfig.popularAddresses.length)];
     console.log(`🎯 Target address: ${targetAddress}`);
     
     // First try: Fetch recent transactions from Etherscan API (primary with API key)
@@ -99,6 +134,46 @@ function withTimeout(promise, timeoutMs) {
       setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms`)), timeoutMs)
     )
   ]);
+}
+
+// Fetch Katana transactions (simulated for now)
+async function fetchKatanaTransactions(count) {
+  console.log(`🗡️ Generating Katana testnet transactions (${count} requested)`);
+  
+  // Simulate Katana-specific transaction patterns
+  const katanaTransactions = [];
+  const currentTime = Date.now();
+  const currentBlockNumber = 1000000 + Math.floor(Math.random() * 10000); // Katana block numbers
+  
+  for (let i = 0; i < count; i++) {
+    const txType = Math.random();
+    let transaction;
+    
+    if (txType < 0.4) {
+      // Katana bridge transactions (common)
+      transaction = generateKatanaBridgeTransaction(i, currentBlockNumber);
+    } else if (txType < 0.6) {
+      // Katana DEX transactions  
+      transaction = generateKatanaDexTransaction(i, currentBlockNumber);
+    } else if (txType < 0.8) {
+      // Gaming/NFT transactions (Katana specialty)
+      transaction = generateKatanaGameTransaction(i, currentBlockNumber);
+    } else {
+      // Katana validator/staking transactions
+      transaction = generateKatanaStakingTransaction(i, currentBlockNumber);
+    }
+    
+    // Add Katana-specific timing and gas
+    transaction.timestamp = new Date(currentTime - (i * 1000 * 30 * Math.random())).toISOString(); // Faster blocks
+    transaction.gasUsed = Math.floor(Math.random() * 50000) + 21000; // Lower gas usage
+    transaction.gasPrice = Math.floor(Math.random() * 5) + 1; // Much lower gas prices
+    transaction.chain = 'katana';
+    
+    katanaTransactions.push(transaction);
+  }
+  
+  console.log(`✅ Generated ${katanaTransactions.length} Katana transactions`);
+  return katanaTransactions;
 }
 
 // Fetch from Etherscan V2 API using the unified endpoint
@@ -795,7 +870,7 @@ export function parseTransactionData(rawTransaction) {
 }
 
 // Fetch and analyze recent transactions, filtering for risk score > 0
-export async function fetchAndAnalyzeTransactions(count = 10) {
+export async function fetchAndAnalyzeTransactions(count = 10, chain = 'ethereum') {
   try {
     // Check if API key is available
     if (!ETHERSCAN_API_KEY) {
@@ -803,7 +878,7 @@ export async function fetchAndAnalyzeTransactions(count = 10) {
     }
     
     // Fetch more transactions than needed since we'll filter for risky ones
-    const rawTransactions = await fetchRecentTransactions(null, count * 3);
+    const rawTransactions = await fetchRecentTransactions(null, count * 3, chain);
     const analyzedTransactions = rawTransactions.map(parseTransactionData);
     
     // Filter for transactions with risk score > 0
@@ -960,5 +1035,115 @@ function generateMevSandwichTransaction(index, blockNumber) {
     victimTxHash: `0x${Math.random().toString(16).substring(2, 10)}...${Math.random().toString(16).substring(2, 6)}`,
     pool: ["WETH/USDC", "WETH/USDT"][Math.floor(Math.random() * 2)],
     category: "MEV Sandwich Attack"
+  };
+}
+
+// Katana-specific transaction generators
+function generateKatanaBridgeTransaction(index, blockNumber) {
+  const isRisky = Math.random() < 0.3;
+  
+  return {
+    id: `katana_bridge_${index}`,
+    hash: `0x${Math.random().toString(16).substring(2, 10)}...${Math.random().toString(16).substring(2, 6)}`,
+    from: generateRandomAddress(),
+    to: CHAIN_CONFIGS.katana.popularAddresses[1], // Bridge contract
+    value: (Math.random() * 10).toFixed(6),
+    blockNumber: blockNumber - Math.floor(Math.random() * 5),
+    typeHints: ["Bridge", "Transfer"],
+    bridge: {
+      sourceChain: Math.random() < 0.5 ? "Ethereum" : "Ronin",
+      targetChain: "Katana",
+      bridgeType: "Asset Transfer",
+      verificationStatus: isRisky ? "Pending" : "Verified"
+    },
+    token: {
+      name: isRisky ? generateScamTokenName() : ["AXS", "SLP", "WETH", "USDC"][Math.floor(Math.random() * 4)],
+      verified: !isRisky,
+      liquidityUSD: isRisky ? Math.random() * 20000 : Math.random() * 500000 + 100000
+    },
+    category: "Katana Bridge Transaction"
+  };
+}
+
+function generateKatanaDexTransaction(index, blockNumber) {
+  const isRisky = Math.random() < 0.4;
+  
+  return {
+    id: `katana_dex_${index}`,
+    hash: `0x${Math.random().toString(16).substring(2, 10)}...${Math.random().toString(16).substring(2, 6)}`,
+    from: generateRandomAddress(),
+    to: CHAIN_CONFIGS.katana.popularAddresses[2], // DEX contract
+    value: (Math.random() * 5).toFixed(6),
+    blockNumber: blockNumber - Math.floor(Math.random() * 5),
+    typeHints: ["Swap"],
+    dex: {
+      name: "Katana DEX",
+      slippagePct: isRisky ? Math.random() * 25 + 10 : Math.random() * 5,
+      poolLiquidityUSD: isRisky ? Math.random() * 15000 + 5000 : Math.random() * 200000 + 50000
+    },
+    token: {
+      name: isRisky ? generateScamTokenName() : ["AXS", "SLP", "RON"][Math.floor(Math.random() * 3)],
+      verified: !isRisky,
+      notAllowlisted: isRisky,
+      contractAgeDays: isRisky ? Math.floor(Math.random() * 7) : Math.floor(Math.random() * 365) + 30
+    },
+    gaming: {
+      gameRelated: true,
+      gameTitle: ["Axie Infinity", "Pixels", "Apeiron"][Math.floor(Math.random() * 3)]
+    },
+    category: "Katana DEX Swap"
+  };
+}
+
+function generateKatanaGameTransaction(index, blockNumber) {
+  const gameAssets = ["Land NFT", "Axie NFT", "Game Item", "Breeding Pass", "Mystic Part"];
+  const games = ["Axie Infinity", "Pixels", "Apeiron", "Lumiterra", "The Machines Arena"];
+  
+  return {
+    id: `katana_game_${index}`,
+    hash: `0x${Math.random().toString(16).substring(2, 10)}...${Math.random().toString(16).substring(2, 6)}`,
+    from: generateRandomAddress(),
+    to: generateRandomAddress(),
+    value: (Math.random() * 2).toFixed(6),
+    blockNumber: blockNumber - Math.floor(Math.random() * 5),
+    typeHints: ["NFT", "Gaming"],
+    gaming: {
+      gameRelated: true,
+      gameTitle: games[Math.floor(Math.random() * games.length)],
+      assetType: gameAssets[Math.floor(Math.random() * gameAssets.length)],
+      rarity: ["Common", "Rare", "Epic", "Mystic"][Math.floor(Math.random() * 4)]
+    },
+    nft: {
+      tokenId: Math.floor(Math.random() * 10000).toString(),
+      collection: "Official Game Assets",
+      verified: true
+    },
+    category: "Katana Gaming Transaction"
+  };
+}
+
+function generateKatanaStakingTransaction(index, blockNumber) {
+  const stakingActions = ["Stake", "Unstake", "Claim Rewards", "Delegate"];
+  
+  return {
+    id: `katana_staking_${index}`,
+    hash: `0x${Math.random().toString(16).substring(2, 10)}...${Math.random().toString(16).substring(2, 6)}`,
+    from: generateRandomAddress(),
+    to: CHAIN_CONFIGS.katana.popularAddresses[0], // System contract
+    value: (Math.random() * 100).toFixed(6),
+    blockNumber: blockNumber - Math.floor(Math.random() * 5),
+    typeHints: ["Staking", "DeFi"],
+    staking: {
+      action: stakingActions[Math.floor(Math.random() * stakingActions.length)],
+      validator: `Validator_${Math.floor(Math.random() * 100)}`,
+      amount: (Math.random() * 1000).toFixed(2),
+      rewards: (Math.random() * 50).toFixed(4)
+    },
+    token: {
+      name: "RON",
+      verified: true,
+      staking: true
+    },
+    category: "Katana Staking Transaction"
   };
 }

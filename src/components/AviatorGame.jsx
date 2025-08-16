@@ -579,7 +579,7 @@ export default function AviatorGame({ characters, mousePos }) {
       {/* Transaction Types Description Card */}
       <div style={{
         position: 'absolute',
-        top: '80px',
+        top: '170px',
         left: '20px',
         background: 'rgba(0,0,0,0.85)',
         padding: '1.5rem',
@@ -596,7 +596,7 @@ export default function AviatorGame({ characters, mousePos }) {
           color: '#74b9ff',
           textAlign: 'center'
         }}>
-          🔍 Transaction Risk Types
+        Transaction Risk Types
         </h3>
         
         <div style={{ marginBottom: '1rem' }}>

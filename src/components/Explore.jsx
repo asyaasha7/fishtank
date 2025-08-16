@@ -12,21 +12,21 @@ function transactionToCharacter(tx) {
   let background = "linear-gradient(135deg, #74b9ff 0%, #0984e3 100%)"
   
   if (tx.typeHints?.includes("Transfer") && tx.token?.notAllowlisted) {
-    characterType = "Scam Token Hunter"
-    avatar = "🕵️‍♂️"
+    characterType = "Toxic Predator"
+    avatar = "🦈"
     background = "linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%)"
   } else if (tx.approval?.method === "approve") {
-    characterType = "Approval Guardian"
-    avatar = "🛡️"
+    characterType = "Pufferfish Trap"
+    avatar = "🐡"
     background = "linear-gradient(135deg, #fdcb6e 0%, #e17055 100%)"
   } else if (tx.typeHints?.includes("Swap") || tx.dex?.name) {
-    characterType = "Slippage Sentinel"
-    avatar = "⚡"
-    background = "linear-gradient(135deg, #74b9ff 0%, #0984e3 100%)"
+    characterType = "Turbulent Current"
+    avatar = "🌊"
+    background = "linear-gradient(135deg, #00bfff 0%, #0096ff 100%)"
   } else if (tx.mev?.isSandwichLeg) {
-    characterType = "MEV Detective"
-    avatar = "🤖"
-    background = "linear-gradient(135deg, #a29bfe 0%, #6c5ce7 100%)"
+    characterType = "Treasure Jellyfish"
+    avatar = "🐚"
+    background = "linear-gradient(135deg, #40e0d0 0%, #20b2aa 100%)"
   }
   
   const riskLevel = riskAnalysis.risk >= 60 ? "CRITICAL" :
@@ -58,10 +58,10 @@ function transactionToCharacter(tx) {
 
 function getCharacterDescription(type, riskAnalysis) {
   const descriptions = {
-    "Scam Token Hunter": "Detecting suspicious token transfers with low liquidity and unverified contracts",
-    "Approval Guardian": "Monitoring token approvals to unknown or potentially malicious contracts", 
-    "Slippage Sentinel": "Identifying DEX swaps with extreme slippage indicating possible manipulation",
-    "MEV Detective": "Tracking MEV sandwich attacks and front-running patterns in transaction blocks",
+    "Toxic Predator": "Detecting suspicious token transfers in contaminated pools with unverified contracts",
+    "Pufferfish Trap": "Monitoring token approvals to unknown currents and potentially malicious depths", 
+    "Turbulent Current": "Identifying DEX swaps with extreme turbulence indicating possible manipulation",
+    "Treasure Jellyfish": "Tracking MEV sandwich attacks and front-running patterns in transaction currents",
     "Standard Transaction": "Regular blockchain transaction with standard risk characteristics"
   }
   
@@ -70,28 +70,28 @@ function getCharacterDescription(type, riskAnalysis) {
 
 // Category configuration for transaction types
 const typeConfig = {
-  "Scam Token Hunter": {
-    icon: "🕵️‍♂️",
+  "Toxic Predator": {
+    icon: "🦈",
     color: "#ff6b6b",
     gradient: "linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%)",
-    description: "Detecting suspicious token transfers with unverified contracts"
+    description: "Detecting suspicious token transfers in contaminated pools"
   },
-  "Approval Guardian": {
-    icon: "🛡️", 
+  "Pufferfish Trap": {
+    icon: "🐡", 
     color: "#fdcb6e",
     gradient: "linear-gradient(135deg, #fdcb6e 0%, #e17055 100%)",
-    description: "Monitoring infinite approvals to unknown spenders"
+    description: "Monitoring infinite approvals to unknown currents"
   },
-  "Slippage Sentinel": {
-    icon: "⚡",
-    color: "#74b9ff",
-    gradient: "linear-gradient(135deg, #74b9ff 0%, #0984e3 100%)",
-    description: "Identifying swaps with extreme slippage and thin liquidity"
+  "Turbulent Current": {
+    icon: "🌊",
+    color: "#00bfff",
+    gradient: "linear-gradient(135deg, #00bfff 0%, #0096ff 100%)",
+    description: "Identifying swaps with extreme turbulence and shallow pools"
   },
-  "MEV Detective": {
-    icon: "🤖",
-    color: "#a29bfe", 
-    gradient: "linear-gradient(135deg, #a29bfe 0%, #6c5ce7 100%)",
+  "Treasure Jellyfish": {
+    icon: "🐚",
+    color: "#40e0d0", 
+    gradient: "linear-gradient(135deg, #40e0d0 0%, #20b2aa 100%)",
     description: "Tracking sandwich attacks and front-running patterns"
   },
   "Standard Transaction": {
@@ -539,7 +539,7 @@ function Explore() {
     return (
       <div style={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #2c3e50 0%, #34495e 50%, #2c3e50 100%)',
+        background: 'linear-gradient(135deg, #0a1428 0%, #1e3a5f 25%, #2c5aa0 50%, #1e3a5f 75%, #0a1428 100%)',
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
@@ -562,7 +562,7 @@ function Explore() {
     return (
       <div style={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #2c3e50 0%, #34495e 50%, #2c3e50 100%)',
+        background: 'linear-gradient(135deg, #0a1428 0%, #1e3a5f 25%, #2c5aa0 50%, #1e3a5f 75%, #0a1428 100%)',
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
@@ -575,7 +575,7 @@ function Explore() {
           <button 
             onClick={refreshTransactions}
             style={{
-              background: 'linear-gradient(135deg, #74b9ff 0%, #0984e3 100%)',
+              background: 'linear-gradient(135deg, #00ffff 0%, #0096ff 100%)',
               border: 'none',
               padding: '1rem 2rem',
               borderRadius: '8px',
@@ -616,7 +616,7 @@ function Explore() {
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent'
         }}>
-          Transaction Risk Analysis
+          Liquidity Pool Analysis
         </h1>
         
         {/* Chain Switching Controls */}
@@ -631,9 +631,9 @@ function Explore() {
             style={{
               padding: '10px 20px',
               borderRadius: '8px',
-              border: selectedChain === 'ethereum' ? '2px solid #74b9ff' : '1px solid rgba(255,255,255,0.3)',
-              background: selectedChain === 'ethereum' ? 'rgba(116, 185, 255, 0.2)' : 'rgba(255,255,255,0.1)',
-              color: selectedChain === 'ethereum' ? '#74b9ff' : '#ffffff',
+              border: selectedChain === 'ethereum' ? '2px solid #00ffff' : '1px solid rgba(255,255,255,0.3)',
+              background: selectedChain === 'ethereum' ? 'rgba(0, 255, 255, 0.2)' : 'rgba(255,255,255,0.1)',
+              color: selectedChain === 'ethereum' ? '#00ffff' : '#ffffff',
               fontSize: '14px',
               fontWeight: 'bold',
               cursor: 'pointer',
@@ -700,7 +700,7 @@ function Explore() {
             opacity: '0.8',
             marginBottom: '0.5rem'
           }}>
-            Analyzing high-risk blockchain transactions grouped by type (Risk Score &gt; 0)
+            Analyzing dangerous marine creatures in blockchain liquidity pools (Risk Score &gt; 0)
           </p>
           
           <p style={{
@@ -710,15 +710,15 @@ function Explore() {
             fontStyle: 'italic'
           }}>
             {selectedChain === 'ethereum' 
-              ? 'Fetching from Ethereum mainnet via Etherscan V2 API, filtering for suspicious transactions'
-              : 'Analyzing Katana network gaming ecosystem transactions, including bridge operations and NFT trades'
+              ? 'Swimming through Ethereum seas via Etherscan V2 API, detecting predators and toxic pools'
+              : 'Exploring Katana coral reefs and gaming ecosystem currents, including bridge depths and NFT treasures'
             }
           </p>
           
           <button 
             onClick={refreshTransactions}
             style={{
-              background: 'linear-gradient(135deg, #74b9ff 0%, #0984e3 100%)',
+              background: 'linear-gradient(135deg, #00ffff 0%, #0096ff 100%)',
               border: 'none',
               padding: '0.8rem 1.5rem',
               borderRadius: '8px',
@@ -748,7 +748,7 @@ function Explore() {
           textAlign: 'center'
         }}>
           <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.5rem' }}>
-            Transaction Overview
+            Marine Life Overview
           </h3>
           <div style={{
             display: 'flex',
@@ -757,11 +757,11 @@ function Explore() {
             flexWrap: 'wrap'
           }}>
             <div>
-              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#74b9ff' }}>
+              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#00ffff' }}>
                 {characters.length}
               </div>
               <div style={{ fontSize: '0.9rem', opacity: '0.8' }}>
-                Total Transactions
+                Total Creatures
               </div>
             </div>
             <div>
@@ -769,7 +769,7 @@ function Explore() {
                 {Object.keys(groupedCharacters).length}
               </div>
               <div style={{ fontSize: '0.9rem', opacity: '0.8' }}>
-                Risk Categories
+                Species Types
               </div>
             </div>
             <div>
@@ -777,7 +777,7 @@ function Explore() {
                 {characters.filter(c => c.class === 'CRITICAL' || c.class === 'EXTREME').length}
               </div>
               <div style={{ fontSize: '0.9rem', opacity: '0.8' }}>
-                High-Risk Alerts
+                Dangerous Predators
               </div>
             </div>
           </div>

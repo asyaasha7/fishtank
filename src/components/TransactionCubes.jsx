@@ -9,10 +9,10 @@ function TransactionCube({ character, position, speed, scale }) {
   // Get color from character's type configuration
   const getColor = (characterName) => {
     const colorMap = {
-      "Scam Token Hunter": "#ff6b6b",
-      "Approval Guardian": "#fdcb6e", 
-      "Slippage Sentinel": "#74b9ff",
-      "MEV Detective": "#a29bfe",
+      "Toxic Predator": "#ff6b6b",
+      "Pufferfish Trap": "#fdcb6e", 
+      "Turbulent Current": "#00bfff",
+      "Treasure Jellyfish": "#40e0d0",
       "Standard Transaction": "#00b894"
     }
     return colorMap[characterName] || "#ffffff"

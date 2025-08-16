@@ -10,10 +10,11 @@ function Navigation() {
     left: 0,
     right: 0,
     zIndex: 1000,
-    background: 'rgba(0, 0, 0, 0.8)',
+    background: 'linear-gradient(135deg, rgba(0, 30, 60, 0.9) 0%, rgba(0, 20, 40, 0.95) 100%)',
     backdropFilter: 'blur(10px)',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-    padding: '1rem 2rem'
+    borderBottom: '1px solid rgba(0, 255, 255, 0.3)',
+    padding: '1rem 2rem',
+    boxShadow: '0 4px 20px rgba(0, 255, 255, 0.1)'
   }
 
   const navContainerStyle = {
@@ -27,8 +28,9 @@ function Navigation() {
   const logoStyle = {
     fontSize: '1.5rem',
     fontWeight: 'bold',
-    color: 'white',
-    textDecoration: 'none'
+    color: '#00ffff',
+    textDecoration: 'none',
+    textShadow: '0 0 10px rgba(0, 255, 255, 0.5)'
   }
 
   const navLinksStyle = {
@@ -50,15 +52,16 @@ function Navigation() {
 
   const activeLinkStyle = {
     ...linkStyle,
-    background: 'rgba(255, 255, 255, 0.1)',
-    border: '1px solid rgba(255, 255, 255, 0.2)'
+    background: 'linear-gradient(135deg, rgba(0, 255, 255, 0.2) 0%, rgba(0, 150, 255, 0.2) 100%)',
+    border: '1px solid rgba(0, 255, 255, 0.4)',
+    boxShadow: '0 0 15px rgba(0, 255, 255, 0.3)'
   }
 
   return (
     <nav style={navStyle}>
       <div style={navContainerStyle}>
         <Link to="/" style={logoStyle}>
-        The Fishtank: MEV Hunter
+          🌊 Fishtank: Liquidity Hunter
         </Link>
         
         <ul style={navLinksStyle}>
@@ -68,12 +71,14 @@ function Navigation() {
               style={location.pathname === '/' ? activeLinkStyle : linkStyle}
               onMouseEnter={(e) => {
                 if (location.pathname !== '/') {
-                  e.target.style.background = 'rgba(255, 255, 255, 0.1)'
+                  e.target.style.background = 'rgba(0, 255, 255, 0.1)'
+                  e.target.style.boxShadow = '0 0 10px rgba(0, 255, 255, 0.2)'
                 }
               }}
               onMouseLeave={(e) => {
                 if (location.pathname !== '/') {
                   e.target.style.background = 'transparent'
+                  e.target.style.boxShadow = 'none'
                 }
               }}
             >
@@ -86,16 +91,38 @@ function Navigation() {
               style={location.pathname === '/explore' ? activeLinkStyle : linkStyle}
               onMouseEnter={(e) => {
                 if (location.pathname !== '/explore') {
-                  e.target.style.background = 'rgba(255, 255, 255, 0.1)'
+                  e.target.style.background = 'rgba(0, 255, 255, 0.1)'
+                  e.target.style.boxShadow = '0 0 10px rgba(0, 255, 255, 0.2)'
                 }
               }}
               onMouseLeave={(e) => {
                 if (location.pathname !== '/explore') {
                   e.target.style.background = 'transparent'
+                  e.target.style.boxShadow = 'none'
                 }
               }}
             >
               Explore
+            </Link>
+          </li>
+          <li>
+            <Link 
+              to="/profile" 
+              style={location.pathname === '/profile' ? activeLinkStyle : linkStyle}
+              onMouseEnter={(e) => {
+                if (location.pathname !== '/profile') {
+                  e.target.style.background = 'rgba(0, 255, 255, 0.1)'
+                  e.target.style.boxShadow = '0 0 10px rgba(0, 255, 255, 0.2)'
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (location.pathname !== '/profile') {
+                  e.target.style.background = 'transparent'
+                  e.target.style.boxShadow = 'none'
+                }
+              }}
+            >
+              Profile
             </Link>
           </li>
         </ul>

@@ -2,25 +2,48 @@ import React, { useState, useEffect } from 'react'
 import { Canvas } from '@react-three/fiber'
 import Scene from './Scene'
 import TransactionCubes from './TransactionCubes'
-import AviatorGame from './AviatorGame'
+import FishtankGame from './AviatorGame'
 import { fetchAndAnalyzeTransactions } from '../services/ethereumApi'
 import { scoreRisk } from '../utils/riskScoring'
 
-// Convert transaction to character format (simplified version)
+// Convert transaction to character format with improved creature distribution
 function transactionToCharacter(tx) {
   const riskAnalysis = scoreRisk(tx)
   
-  // Determine character type based on transaction characteristics
+  // Determine character type based on transaction characteristics and risk
   let characterType = "Standard Transaction"
   
-  if (tx.typeHints?.includes("Transfer") && tx.token?.notAllowlisted) {
-    characterType = "Scam Token Hunter"
-  } else if (tx.approval?.method === "approve") {
-    characterType = "Approval Guardian"
-  } else if (tx.typeHints?.includes("Swap") || tx.dex?.name) {
-    characterType = "Slippage Sentinel"
-  } else if (tx.mev?.isSandwichLeg) {
-    characterType = "MEV Detective"
+  // High-risk transactions become Toxic Predators (more inclusive criteria)
+  if (riskAnalysis.risk >= 50 || 
+      (tx.typeHints?.includes("Transfer") && tx.token?.notAllowlisted) ||
+      (tx.token && !tx.token.verified) ||
+      (tx.token?.contractAgeDays && tx.token.contractAgeDays < 7) ||
+      tx.lists?.addressOnBlocklist ||
+      tx.category === "Scam Token Transfer") {
+    characterType = "Toxic Predator"
+    console.log('🦈 Creating Toxic Predator:', tx.id, 'Risk:', riskAnalysis.risk, 'Category:', tx.category, 'Token:', tx.token)
+  } 
+  // MEV/Sandwich attacks become valuable Treasure Jellyfish
+  else if (tx.mev?.isSandwichLeg || 
+           tx.mev?.bundlePosition || 
+           (riskAnalysis.risk >= 40 && tx.typeHints?.includes("MEV"))) {
+    characterType = "Treasure Jellyfish"
+  }
+  // Approval transactions become Pufferfish Traps
+  else if (tx.approval?.method === "approve" || 
+           tx.typeHints?.includes("Approval")) {
+    characterType = "Pufferfish Trap"
+  }
+  // Swap transactions with slippage become Turbulent Current
+  else if (tx.typeHints?.includes("Swap") || 
+           tx.dex?.name || 
+           (tx.slippage && tx.slippage > 5)) {
+    characterType = "Turbulent Current"
+  }
+  // Medium risk transactions also become Toxic Predators for more variety
+  else if (riskAnalysis.risk >= 30 && Math.random() < 0.4) {
+    characterType = "Toxic Predator"
+    console.log('🦈 Creating Toxic Predator (medium risk):', tx.id, 'Risk:', riskAnalysis.risk)
   }
   
   return {
@@ -89,8 +112,10 @@ function Home() {
       if (isInitialLoad) {
         setLoading(true)
         console.log(`🎲 Loading initial transactions for 3D cube visualization from ${selectedChain.toUpperCase()}...`)
-        const transactions = await fetchAndAnalyzeTransactions(12, selectedChain)
+        const transactions = await fetchAndAnalyzeTransactions(40, selectedChain)
         const characterList = transactions.map(transactionToCharacter)
+        console.log('🎯 Generated characters:', characterList.map(c => c.name))
+        console.log('🦈 Toxic Predators found:', characterList.filter(c => c.name === "Toxic Predator").length)
         setCharacters(characterList)
         
         // Check data source for better user feedback
@@ -107,7 +132,7 @@ function Home() {
         
         setCharacters(prevCharacters => {
           // Add new transactions to the end and remove old ones from the front
-          const maxTransactions = 18 // Maintain a rolling buffer of 18 transactions
+          const maxTransactions = 50 // Maintain a rolling buffer of 50 transactions
           const updatedCharacters = [...prevCharacters, ...newCharacterList]
           
           // Remove oldest transactions if we exceed the limit
@@ -154,7 +179,7 @@ function Home() {
           <div style={{ 
             fontSize: '12px',
             opacity: 0.7,
-            color: '#74b9ff'
+            color: '#00ffff'
           }}>
             Loading transaction data...
           </div>
@@ -228,9 +253,9 @@ function Home() {
             style={{
               padding: '8px 16px',
               borderRadius: '6px',
-              border: selectedChain === 'ethereum' ? '2px solid #74b9ff' : '1px solid rgba(255,255,255,0.3)',
-              background: selectedChain === 'ethereum' ? 'rgba(116, 185, 255, 0.2)' : 'rgba(255,255,255,0.1)',
-              color: selectedChain === 'ethereum' ? '#74b9ff' : '#ffffff',
+              border: selectedChain === 'ethereum' ? '2px solid #00ffff' : '1px solid rgba(255,255,255,0.3)',
+              background: selectedChain === 'ethereum' ? 'rgba(0, 255, 255, 0.2)' : 'rgba(255,255,255,0.1)',
+              color: selectedChain === 'ethereum' ? '#00ffff' : '#ffffff',
               fontSize: '12px',
               fontWeight: 'bold',
               cursor: 'pointer',
@@ -302,7 +327,7 @@ function Home() {
         </div>
       </div>
       
-      {/* Aviator Game */}
+      {/* Fishtank Game */}
       {!loading && characters.length > 0 && (
         <div style={{
           position: 'absolute',
@@ -312,7 +337,7 @@ function Home() {
           height: 'calc(100vh - 60px)',
           zIndex: 0
         }}>
-          <AviatorGame characters={characters} mousePos={mousePos} />
+          <FishtankGame characters={characters} mousePos={mousePos} />
         </div>
       )}
     </div>

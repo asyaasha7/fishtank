@@ -126,20 +126,20 @@ function ParticleEffect({ position, color, onComplete }) {
 }
 
 // Enhanced transaction cube with collision detection
-function GameTransactionCube({ character, position, speed, scale, sphereRef, onCollected }) {
+function GameTransactionCube({ character, position, speed, scale, sphereRef, onCollected, isShieldActive }) {
   const meshRef = useRef()
   const [isCollected, setIsCollected] = useState(false)
-  
+  const [lastPushTime, setLastPushTime] = useState(0)
   // Keep track of cube's current position independently
   const currentPosition = useRef([...position])
   
   // Get color from character's type configuration
   const getColor = (characterName) => {
     const colorMap = {
-      "Scam Token Hunter": "#ff6b6b",
-      "Approval Guardian": "#fdcb6e", 
-      "Slippage Sentinel": "#74b9ff",
-      "MEV Detective": "#a29bfe",  // This is the collectible one!
+      "Toxic Predator": "#ff6b6b",
+      "Pufferfish Trap": "#fdcb6e", 
+      "Turbulent Current": "#00bfff",
+      "Treasure Jellyfish": "#40e0d0",  // This is the collectible one!
       "Standard Transaction": "#00b894"
     }
     return colorMap[characterName] || "#ffffff"
@@ -150,14 +150,26 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
       // Different movement speeds based on character type
       let movementSpeed = 15; // Default speed
       
-      if (character.name === "Scam Token Hunter") {
+      if (character.name === "Toxic Predator") {
         movementSpeed = 15; // Keep same speed as default for dangerous cubes
-        // Make Scam Token Hunter fly at the same Z-axis as the player for better collision
+        
+        // Add vertical oscillation to make Toxic Predators more menacing
+        const time = state.clock.getElapsedTime();
+        const oscillationAmplitude = 1.5; // How far up/down they move
+        const oscillationSpeed = 2.0; // How fast they oscillate
+        const uniqueOffset = character.id * 0.1; // Unique phase offset for each predator
+        
+        currentPosition.current[1] += Math.sin(time * oscillationSpeed + uniqueOffset) * oscillationAmplitude * delta;
+        
+        // Keep them within reasonable bounds
+        currentPosition.current[1] = Math.max(-4, Math.min(4, currentPosition.current[1]));
+        
+        // Make Toxic Predator swim close to the player's Z-axis for better collision
         if (sphereRef.current) {
           currentPosition.current[2] = sphereRef.current.position.z; // Match player's Z position (2)
         }
       } else {
-        // Make other cubes fly slower
+        // Make other cubes swim slower
         movementSpeed = 8; // Slower speed for non-dangerous cubes
       }
       
@@ -169,8 +181,8 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
       meshRef.current.position.y = currentPosition.current[1]
       meshRef.current.position.z = currentPosition.current[2]
       
-      // Special rotation for MEV Detective (more complex)
-      if (character.name === "MEV Detective") {
+      // Special rotation for Treasure Jellyfish (more complex)
+      if (character.name === "Treasure Jellyfish") {
         meshRef.current.rotation.x += delta * 0.3
         meshRef.current.rotation.y += delta * 0.4
         meshRef.current.rotation.z += delta * 0.2
@@ -194,16 +206,28 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
       }
       
       // Check collision with sphere
-      if (sphereRef.current && checkCollision(sphereRef.current, meshRef.current, character.name === "MEV Detective" ? 2.0 : 1.2)) {
-        if (character.name === "MEV Detective") {
+      if (sphereRef.current && checkCollision(sphereRef.current, meshRef.current, character.name === "Treasure Jellyfish" ? 2.0 : 1.2)) {
+        if (character.name === "Treasure Jellyfish") {
           // Collectible! Give points and make it disappear
           setIsCollected(true)
           onCollected(character, meshRef.current.position.clone())
-        } else if (character.name === "Scam Token Hunter") {
+        } else if (character.name === "Toxic Predator") {
           // Dangerous cube - take damage and make it disappear
           setIsCollected(true)
           takeDamage(1)
           onCollected(character, meshRef.current.position.clone(), 'damage')
+        } else if (character.name === "Pufferfish Trap") {
+          // Pufferfish Trap - lose points and make it disappear
+          setIsCollected(true)
+          onCollected(character, meshRef.current.position.clone(), 'points_loss')
+        } else if (character.name === "Turbulent Current") {
+          // Turbulent Current - push fish in random direction but stay active
+          // Add cooldown to prevent continuous pushing
+          const currentTime = Date.now();
+          if (currentTime - lastPushTime > 1000) { // 1 second cooldown
+            setLastPushTime(currentTime);
+            onCollected(character, meshRef.current.position.clone(), 'push');
+          }
         } else {
           // Other cubes - just pass through for now
           // We can add different behavior for other types later
@@ -224,8 +248,8 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
 
   const color = getColor(character.name)
 
-  // Special shape for MEV Detective (diamond/crystal)
-  if (character.name === "MEV Detective") {
+  // Special shape for Treasure Jellyfish (diamond/crystal)
+  if (character.name === "Treasure Jellyfish") {
     return (
       <group ref={meshRef} position={currentPosition.current} scale={scale}>
         {/* Central diamond core */}
@@ -297,7 +321,7 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
 }
 
 // Enhanced flying sphere with collision detection
-const GameSphere = React.memo(({ mousePos, sphereRef }) => {
+const GameSphere = React.memo(({ mousePos, sphereRef, isShieldActive }) => {
   const propellerRef = useRef()
   
   useFrame((state, delta) => {
@@ -391,14 +415,82 @@ const GameSphere = React.memo(({ mousePos, sphereRef }) => {
           opacity={0.6}
         />
       </mesh>
+      
+      {/* Enhanced Shield Effect */}
+      {isShieldActive && (
+        <ShieldEffect />
+      )}
     </group>
   )
 })
 
-// Game cubes manager component
-function GameCubes({ characters, sphereRef, onCubeCollected }) {
-  const [cubeRegistry, setCubeRegistry] = useState(new Map())
+// Shield Effect Component with glowing, blinking animation
+function ShieldEffect() {
+  const shieldRef = useRef()
+  const outerShieldRef = useRef()
   
+  useFrame((state) => {
+    if (shieldRef.current && outerShieldRef.current) {
+      const time = state.clock.getElapsedTime()
+      
+      // Pulsing opacity effect
+      const pulseOpacity = 0.2 + Math.sin(time * 3) * 0.15 // Oscillates between 0.05 and 0.35
+      const outerPulseOpacity = 0.1 + Math.sin(time * 2) * 0.08 // Oscillates between 0.02 and 0.18
+      
+      // Rotating effect
+      shieldRef.current.rotation.y += 0.01
+      outerShieldRef.current.rotation.y -= 0.008
+      shieldRef.current.rotation.x += 0.005
+      
+      // Update materials opacity
+      shieldRef.current.material.opacity = pulseOpacity
+      outerShieldRef.current.material.opacity = outerPulseOpacity
+      
+      // Slight scaling effect for breathing
+      const scale = 1 + Math.sin(time * 2.5) * 0.05
+      shieldRef.current.scale.setScalar(scale)
+      outerShieldRef.current.scale.setScalar(scale * 1.1)
+    }
+  })
+  
+  return (
+    <group>
+      {/* Inner shield - wireframe */}
+      <mesh ref={shieldRef} position={[0, 0, 0]}>
+        <sphereGeometry args={[0.9, 16, 16]} />
+        <meshBasicMaterial 
+          color="#00ffff" 
+          transparent={true} 
+          opacity={0.3}
+          wireframe={true}
+        />
+      </mesh>
+      
+      {/* Outer shield - solid with glow */}
+      <mesh ref={outerShieldRef} position={[0, 0, 0]}>
+        <sphereGeometry args={[1.0, 12, 12]} />
+        <meshBasicMaterial 
+          color="#40e0d0" 
+          transparent={true} 
+          opacity={0.15}
+          wireframe={false}
+        />
+      </mesh>
+      
+      {/* Glowing particles effect */}
+      <pointLight 
+        position={[0, 0, 0]} 
+        intensity={0.3} 
+        color="#00ffff" 
+        distance={3}
+      />
+    </group>
+  )
+}
+
+// Game cubes manager component
+function GameCubes({ characters, sphereRef, onCubeCollected, isShieldActive }) {
+  const [cubeRegistry, setCubeRegistry] = useState(new Map())
   // Create or update cube data, preserving existing cubes and only adding new ones
   const cubeData = useMemo(() => {
     const currentIds = new Set(characters.map(c => c.id))
@@ -414,10 +506,14 @@ function GameCubes({ characters, sphereRef, onCubeCollected }) {
         // Position new cubes further to the right so they enter naturally
         const existingCount = cubeRegistry.size
         
-        // Special positioning for Scam Token Hunter - same Z-axis as player for better collision
+        // Special positioning for specific creature types
         let zPosition;
-        if (character.name === "Scam Token Hunter") {
-          zPosition = 2 + (Math.random() - 0.5) * 0.5; // Close to player's Z-axis (2) with small variance
+        if (character.name === "Treasure Jellyfish") {
+          zPosition = 2 + (Math.random() - 0.5) * 0.5; // Same Z-axis as player (2) with small variance
+        } else if (character.name === "Toxic Predator") {
+          zPosition = 2 + (Math.random() - 0.5) * 1.0; // Close to player but with more variance for hunting
+        } else if (character.name === "Pufferfish Trap") {
+          zPosition = 2 + (Math.random() - 0.5) * 0.5; // Same Z-axis as player (2) for reliable collision
         } else {
           zPosition = (Math.random() - 0.5) * 4; // Normal random Z positioning for other cubes
         }
@@ -453,6 +549,7 @@ function GameCubes({ characters, sphereRef, onCubeCollected }) {
           scale={data.scale}
           sphereRef={sphereRef}
           onCollected={onCubeCollected}
+          isShieldActive={isShieldActive}
         />
       ))}
     </group>
@@ -460,12 +557,12 @@ function GameCubes({ characters, sphereRef, onCubeCollected }) {
 }
 
 // Game scene with all components
-function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealthUpdate }) {
+function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealthUpdate, isShieldActive }) {
   const sphereRef = useRef()
   const [particles, setParticles] = useState([])
 
   const handleCubeCollected = (character, position, type = 'collect') => {
-    if (character.name === "MEV Detective") {
+    if (character.name === "Treasure Jellyfish") {
       // Add points for collecting MEV Detective
       const points = 10 + character.riskAnalysis.risk; // Higher risk = more points
       gameState.score += points
@@ -475,25 +572,103 @@ function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealth
       const newParticle = {
         id: Date.now() + Math.random(),
         position: position.toArray(),
-        color: "#a29bfe"
+        color: "#40e0d0"
       }
       setParticles(prev => [...prev, newParticle])
       
-      console.log(`🎯 Collected MEV Detective! +${points} points (Total: ${gameState.score})`)
+      console.log(`🎯 Collected Treasure Jellyfish! +${points} points (Total: ${gameState.score})`)
     } else if (type === 'damage') {
-      // Handle damage collision
-      onLifeUpdate(gameState.lives)
-      onHealthUpdate(gameState.health)
-      
-      // Create red damage particle effect
-      const newParticle = {
-        id: Date.now() + Math.random(),
-        position: position.toArray(),
-        color: "#ff6b6b"
+      // Check if shield is active and this is a Toxic Predator
+      if (isShieldActive && character.name === "Toxic Predator") {
+        // Shield blocks damage from Toxic Predators
+        const newParticle = {
+          id: Date.now() + Math.random(),
+          position: position.toArray(),
+          color: "#00ffff" // Cyan color for shield block
+        }
+        setParticles(prev => [...prev, newParticle])
+        
+        console.log(`🛡️ Shield blocked damage from ${character.name}!`)
+      } else {
+        // Handle damage collision normally
+        onLifeUpdate(gameState.lives)
+        onHealthUpdate(gameState.health)
+        
+        // Trigger glitch effect for Toxic Predator hits
+        if (character.name === "Toxic Predator") {
+          setGlitchEffect(true)
+          setTimeout(() => setGlitchEffect(false), 500) // Glitch for 0.5 seconds
+        }
+        
+        // Create red damage particle effect
+        const newParticle = {
+          id: Date.now() + Math.random(),
+          position: position.toArray(),
+          color: "#ff6b6b"
+        }
+        setParticles(prev => [...prev, newParticle])
+        
+        console.log(`💥 Hit ${character.name}! Health: ${gameState.health}/${gameState.maxHealth}, Lives: ${gameState.lives}`)
       }
-      setParticles(prev => [...prev, newParticle])
+    } else if (type === 'points_loss') {
+      // Check if shield is active for Pufferfish Trap
+      if (isShieldActive && character.name === "Pufferfish Trap") {
+        // Shield blocks damage from Pufferfish Trap
+        const newParticle = {
+          id: Date.now() + Math.random(),
+          position: position.toArray(),
+          color: "#00ffff" // Cyan color for shield block
+        }
+        setParticles(prev => [...prev, newParticle])
+        
+        console.log(`🛡️ Shield blocked damage from ${character.name}!`)
+      } else {
+        // Handle health reduction from Pufferfish Trap (without damage flash)
+        // Update health directly without triggering red overlay
+        gameState.health = Math.max(0, gameState.health - 1);
+        if (gameState.health <= 0 && gameState.lives > 0) {
+          gameState.lives--;
+          gameState.health = gameState.maxHealth;
+        }
+        if (gameState.lives <= 0) {
+          gameState.isGameOver = true;
+        }
+        
+        // Update UI without damage flash
+        onLifeUpdate(gameState.lives)
+        setHealth(gameState.health)
+        
+        // Also lose some points
+        const pointsLost = Math.min(10, gameState.score); // Lose 10 points or current score if less
+        gameState.score = Math.max(0, gameState.score - pointsLost);
+        onScoreUpdate(gameState.score, -pointsLost);
+        
+        // Create orange particle effect for pufferfish hit
+        const newParticle = {
+          id: Date.now() + Math.random(),
+          position: position.toArray(),
+          color: "#fdcb6e" // Orange color matching Pufferfish Trap
+        }
+        setParticles(prev => [...prev, newParticle])
+        
+        console.log(`🐡 Hit Pufferfish Trap! Health: ${gameState.health}/${gameState.maxHealth}, Lives: ${gameState.lives}, -${pointsLost} points`)
+      }
+    } else if (type === 'push') {
+      // Handle push effect from Turbulent Current
+      if (sphereRef.current) {
+        // Random push direction
+        const pushX = (Math.random() - 0.5) * 4; // Random X push between -2 and 2
+        const pushY = (Math.random() - 0.5) * 4; // Random Y push between -2 and 2
+        
+        // Apply push to player position with bounds checking
+        const newX = Math.max(-3, Math.min(3, sphereRef.current.position.x + pushX));
+        const newY = Math.max(-4, Math.min(4, sphereRef.current.position.y + pushY));
+        
+        sphereRef.current.position.x = newX;
+        sphereRef.current.position.y = newY;
+      }
       
-      console.log(`💥 Hit ${character.name}! Health: ${gameState.health}/${gameState.maxHealth}, Lives: ${gameState.lives}`)
+      console.log(`🌊 Hit Turbulent Current! Fish pushed by current!`)
     }
   }
 
@@ -516,11 +691,12 @@ function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealth
       <pointLight position={[8, 0, 0]} intensity={0.4} color="#00b894" />
       
       {/* Game objects */}
-      <GameSphere mousePos={mousePos} sphereRef={sphereRef} />
+      <GameSphere mousePos={mousePos} sphereRef={sphereRef} isShieldActive={isShieldActive} />
       <GameCubes 
         characters={characters} 
         sphereRef={sphereRef}
         onCubeCollected={handleCubeCollected}
+        isShieldActive={isShieldActive}
       />
       
       {/* Particle effects */}
@@ -540,13 +716,64 @@ function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealth
 }
 
 // Main game component with UI
-export default function AviatorGame({ characters, mousePos }) {
+export default function FishtankGame({ characters, mousePos }) {
   const [score, setScore] = useState(0)
   const [lives, setLives] = useState(3)
   const [health, setHealth] = useState(3) // Current health (0-3)
   const [recentPoints, setRecentPoints] = useState(null)
   const [damageFlash, setDamageFlash] = useState(false)
   const [isGameOver, setIsGameOver] = useState(false)
+  const [isRiskTypesCollapsed, setIsRiskTypesCollapsed] = useState(false)
+  const [isShieldActive, setIsShieldActive] = useState(false)
+  const [shieldTimeLeft, setShieldTimeLeft] = useState(0)
+  const [glitchEffect, setGlitchEffect] = useState(false)
+
+  // Count creatures by type for display
+  const creatureCounts = useMemo(() => {
+    if (!characters || characters.length === 0) {
+      return {
+        "Toxic Predator": 0,
+        "Pufferfish Trap": 0,
+        "Turbulent Current": 0,
+        "Treasure Jellyfish": 0,
+        "Standard Transaction": 0
+      };
+    }
+    
+    const counts = {};
+    characters.forEach(character => {
+      counts[character.name] = (counts[character.name] || 0) + 1;
+    });
+    
+    return {
+      "Toxic Predator": counts["Toxic Predator"] || 0,
+      "Pufferfish Trap": counts["Pufferfish Trap"] || 0,
+      "Turbulent Current": counts["Turbulent Current"] || 0,
+      "Treasure Jellyfish": counts["Treasure Jellyfish"] || 0,
+      "Standard Transaction": counts["Standard Transaction"] || 0
+    };
+  }, [characters])
+
+  // Shield countdown effect
+  useEffect(() => {
+    let shieldTimer;
+    if (isShieldActive && shieldTimeLeft > 0) {
+      shieldTimer = setInterval(() => {
+        setShieldTimeLeft(prev => {
+          if (prev <= 1) {
+            setIsShieldActive(false);
+            console.log('🛡️ Shield expired!');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000); // Update every second
+    }
+    
+    return () => {
+      if (shieldTimer) clearInterval(shieldTimer);
+    };
+  }, [isShieldActive, shieldTimeLeft]);
 
   const handleScoreUpdate = (newScore, points) => {
     setScore(newScore)
@@ -571,6 +798,20 @@ export default function AviatorGame({ characters, mousePos }) {
     // Trigger damage flash effect
     setDamageFlash(true)
     setTimeout(() => setDamageFlash(false), 200)
+  }
+
+  const handleBuyShield = () => {
+    if (score >= 100 && !isShieldActive) {
+      // Deduct points and activate shield
+      setScore(prevScore => prevScore - 100);
+      setIsShieldActive(true);
+      setShieldTimeLeft(10); // 10 seconds of protection
+      console.log('🛡️ Shield activated! 10 seconds of protection against Toxic Predators');
+      
+      // Show points deduction animation
+      setRecentPoints(-100);
+      setTimeout(() => setRecentPoints(null), 1500);
+    }
   }
 
   const handleRestart = () => {
@@ -647,7 +888,7 @@ export default function AviatorGame({ characters, mousePos }) {
           <div style={{
             fontSize: '1.5rem',
             marginBottom: '2rem',
-            color: '#74b9ff'
+            color: '#00ffff'
           }}>
             <div style={{ marginBottom: '0.5rem', opacity: 0.8 }}>
               Final Score
@@ -724,7 +965,7 @@ export default function AviatorGame({ characters, mousePos }) {
       <Canvas
         camera={{ position: [0, 2, 12], fov: 60 }}
         style={{ 
-          background: 'linear-gradient(135deg, #e8f4fd 0%, #a8d8f0 100%)',
+          background: 'linear-gradient(135deg, #0a1428 0%, #1e3a5f 50%, #2c5aa0 100%)',
           width: '100%',
           height: '100%'
         }}
@@ -736,6 +977,7 @@ export default function AviatorGame({ characters, mousePos }) {
           onScoreUpdate={handleScoreUpdate}
           onLifeUpdate={handleLifeUpdate}
           onHealthUpdate={handleHealthUpdate}
+          isShieldActive={isShieldActive}
         />
       </Canvas>
       
@@ -753,34 +995,105 @@ export default function AviatorGame({ characters, mousePos }) {
           animation: 'damageFlash 0.2s ease-out'
         }} />
       )}
+
+      {/* Glitch Effect Overlay */}
+      {glitchEffect && (
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          pointerEvents: 'none',
+          zIndex: 6,
+          background: `
+            repeating-linear-gradient(
+              90deg,
+              transparent,
+              transparent 2px,
+              rgba(255, 0, 100, 0.1) 2px,
+              rgba(255, 0, 100, 0.1) 4px
+            ),
+            repeating-linear-gradient(
+              0deg,
+              transparent,
+              transparent 2px,
+              rgba(0, 255, 255, 0.05) 2px,
+              rgba(0, 255, 255, 0.05) 4px
+            )
+          `,
+          animation: 'glitchEffect 0.5s ease-out',
+          mixBlendMode: 'screen'
+        }} />
+      )}
       
       {/* Transaction Types Description Card */}
       <div style={{
         position: 'absolute',
-        top: '170px',
+        top: '163px',
         left: '20px',
-        background: 'rgba(0,0,0,0.85)',
-        padding: '1.5rem',
+        width: '348px',
+        background: 'linear-gradient(135deg, rgba(0, 30, 60, 0.9) 0%, rgba(0, 20, 40, 0.95) 100%)',
+        padding: isRiskTypesCollapsed ? '1rem' : '1.5rem',
         borderRadius: '12px',
         color: 'white',
         fontSize: '0.9rem',
         maxWidth: '350px',
         zIndex: 10,
-        border: '1px solid rgba(255,255,255,0.2)'
+        border: '1px solid rgba(0, 255, 255, 0.3)',
+        boxShadow: '0 4px 20px rgba(0, 255, 255, 0.1)',
+        transition: 'all 0.3s ease'
       }}>
-        <h3 style={{ 
-          margin: '0 0 1rem 0', 
-          fontSize: '1.2rem', 
-          color: '#74b9ff',
-          textAlign: 'center'
-        }}>
-        Transaction Risk Types
-        </h3>
+        <div 
+          style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between',
+            margin: '0 0 1rem 0',
+            cursor: 'pointer'
+          }}
+          onClick={() => setIsRiskTypesCollapsed(!isRiskTypesCollapsed)}
+        >
+          <h3 style={{ 
+            margin: '0', 
+            fontSize: '1.2rem', 
+            color: '#00ffff',
+            textShadow: '0 0 10px rgba(0, 255, 255, 0.5)'
+          }}>
+            🌊 Liquidity Pool Hazards
+          </h3>
+          <span style={{
+            fontSize: '1rem',
+            color: '#00ffff',
+            transform: isRiskTypesCollapsed ? 'rotate(0deg)' : 'rotate(180deg)',
+            transition: 'transform 0.3s ease'
+          }}>
+            ▼
+          </span>
+        </div>
         
-        <div style={{ marginBottom: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}>
-            <span style={{ fontSize: '1.5rem', marginRight: '0.5rem' }}>💥</span>
-            <strong style={{ color: '#ff6b6b' }}>Scam Token Hunter</strong>
+        {!isRiskTypesCollapsed && (
+        <div style={{
+          maxHeight: isRiskTypesCollapsed ? '0' : '1000px',
+          overflow: 'hidden',
+          transition: 'max-height 0.3s ease'
+        }}>
+          <div style={{ marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <span style={{ fontSize: '1.5rem', marginRight: '0.5rem' }}>🦈</span>
+              <strong style={{ color: '#ff6b6b' }}>Toxic Predator</strong>
+              <span style={{ 
+                marginLeft: '0.5rem', 
+                fontSize: '0.8rem', 
+                background: 'rgba(255, 107, 107, 0.2)', 
+                color: '#ff6b6b', 
+                padding: '0.2rem 0.6rem', 
+                borderRadius: '12px',
+                fontWeight: 'bold',
+                border: '1px solid rgba(255, 107, 107, 0.3)'
+              }}>
+                {creatureCounts["Toxic Predator"]}
+              </span>
             <span style={{ 
               marginLeft: '0.5rem', 
               fontSize: '0.7rem', 
@@ -794,57 +1107,111 @@ export default function AviatorGame({ characters, mousePos }) {
             </span>
           </div>
           <p style={{ margin: '0 0 0 2rem', fontSize: '0.8rem', opacity: 0.9 }}>
-            ⚠️ <strong>AVOID these red cubes!</strong> Newly deployed tokens with unverified contracts, low liquidity, and suspicious holder patterns. Hitting them damages your health!
+            ⚠️ <strong>AVOID these toxic predators!</strong> Contaminated liquidity pools with unverified contracts, low depth, and suspicious whale patterns. Swimming into them damages your health!
           </p>
         </div>
         
         <div style={{ marginBottom: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}>
-            <span style={{ fontSize: '1.5rem', marginRight: '0.5rem' }}>🛡️</span>
-            <strong style={{ color: '#fdcb6e' }}>Approval Guardian</strong>
+                          <span style={{ fontSize: '1.5rem', marginRight: '0.5rem' }}>🐡</span>
+              <strong style={{ color: '#fdcb6e' }}>Pufferfish Trap</strong>
+              <span style={{ 
+                marginLeft: '0.5rem', 
+                fontSize: '0.8rem', 
+                background: 'rgba(253, 203, 110, 0.2)', 
+                color: '#fdcb6e', 
+                padding: '0.2rem 0.6rem', 
+                borderRadius: '12px',
+                fontWeight: 'bold',
+                border: '1px solid rgba(253, 203, 110, 0.3)'
+              }}>
+                {creatureCounts["Pufferfish Trap"]}
+              </span>
           </div>
           <p style={{ margin: '0 0 0 2rem', fontSize: '0.8rem', opacity: 0.9 }}>
-            Infinite token approvals to unknown or unverified contracts. First step in many wallet drain attacks.
+            Infinite token approvals to unknown currents. These spiky traps damage your health and steal some points when touched.
           </p>
         </div>
         
         <div style={{ marginBottom: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}>
-            <span style={{ fontSize: '1.5rem', marginRight: '0.5rem' }}>⚡</span>
-            <strong style={{ color: '#74b9ff' }}>Slippage Sentinel</strong>
+                          <span style={{ fontSize: '1.5rem', marginRight: '0.5rem' }}>🌊</span>
+              <strong style={{ color: '#00bfff' }}>Turbulent Current</strong>
+              <span style={{ 
+                marginLeft: '0.5rem', 
+                fontSize: '0.8rem', 
+                background: 'rgba(0, 191, 255, 0.2)', 
+                color: '#00bfff', 
+                padding: '0.2rem 0.6rem', 
+                borderRadius: '12px',
+                fontWeight: 'bold',
+                border: '1px solid rgba(0, 191, 255, 0.3)'
+              }}>
+                {creatureCounts["Turbulent Current"]}
+              </span>
           </div>
           <p style={{ margin: '0 0 0 2rem', fontSize: '0.8rem', opacity: 0.9 }}>
-            DEX swaps with extreme slippage (&gt;15%), often targeting thin liquidity pools or exotic tokens.
+            DEX swaps with extreme slippage (&gt;15%), creating dangerous turbulence in shallow pools or exotic coral reefs.
           </p>
         </div>
         
         <div style={{ marginBottom: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}>
-            <span style={{ fontSize: '1.5rem', marginRight: '0.5rem' }}>💎</span>
-            <strong style={{ color: '#a29bfe' }}>MEV Detective</strong>
+            <span style={{ fontSize: '1.5rem', marginRight: '0.5rem' }}>🐚</span>
+            <strong style={{ color: '#40e0d0' }}>Treasure Jellyfish</strong>
+            <span style={{ 
+              marginLeft: '0.5rem', 
+              fontSize: '0.8rem', 
+              background: 'rgba(64, 224, 208, 0.2)', 
+              color: '#40e0d0', 
+              padding: '0.2rem 0.6rem', 
+              borderRadius: '12px',
+              fontWeight: 'bold',
+              border: '1px solid rgba(64, 224, 208, 0.3)'
+            }}>
+              {creatureCounts["Treasure Jellyfish"]}
+            </span>
           </div>
           <p style={{ margin: '0 0 0 2rem', fontSize: '0.8rem', opacity: 0.9 }}>
-            <span style={{ color: '#00b894', fontWeight: 'bold' }}>COLLECTIBLE!</span> Sandwich attacks and front-running patterns. Collect these diamond crystals for bonus points!
+            <span style={{ color: '#00b894', fontWeight: 'bold' }}>COLLECTIBLE!</span> Sandwich attacks and front-running patterns. Collect these luminous jellyfish for bonus points!
           </p>
         </div>
         
-        <div style={{ 
-          borderTop: '1px solid rgba(255,255,255,0.2)', 
-          paddingTop: '1rem',
-          textAlign: 'center',
-          fontSize: '0.8rem',
-          opacity: 0.7
-        }}>
-          💡 Higher risk transactions = more points when collected
+          <div style={{ 
+            borderTop: '1px solid rgba(255,255,255,0.2)', 
+            paddingTop: '1rem',
+            marginTop: '1rem'
+          }}>
+            <div style={{
+              textAlign: 'center',
+              marginBottom: '0.8rem',
+              fontSize: '0.85rem',
+              fontWeight: 'bold',
+              color: '#00ffff'
+            }}>
+              📊 Total Active Creatures: {characters ? characters.length : 0}
+            </div>
+            <div style={{ 
+              textAlign: 'center',
+              fontSize: '0.8rem',
+              opacity: 0.7
+            }}>
+              🐠 Navigate dangerous waters - higher risk pools = more treasure when collected
+            </div>
+          </div>
         </div>
+        )}
       </div>
 
       {/* Game UI Overlay */}
       <div style={{
         position: 'absolute',
-        top: '20px',
+        bottom: '20px',
+        width: '443px',
         right: '20px',
-        background: 'rgba(0,0,0,0.8)',
+        background: 'linear-gradient(135deg, rgba(0, 30, 60, 0.9) 0%, rgba(0, 20, 40, 0.95) 100%)',
+        border: '1px solid rgba(0, 255, 255, 0.3)',
+        boxShadow: '0 4px 20px rgba(0, 255, 255, 0.1)',
         padding: '1.5rem',
         borderRadius: '12px',
         color: 'white',
@@ -863,7 +1230,7 @@ export default function AviatorGame({ characters, mousePos }) {
           <span style={{ 
             fontSize: '1.5rem', 
             fontWeight: 'bold', 
-            color: '#74b9ff'
+            color: '#00ffff'
           }}>
             {score}
           </span>
@@ -939,33 +1306,104 @@ export default function AviatorGame({ characters, mousePos }) {
             opacity: 0.6,
             textAlign: 'center'
           }}>
-            💥 3 hits from Scam Token Hunter = 1 heart lost
+            🦈 3 hits from Toxic Predator = 1 life lost
           </div>
         </div>
-        
-        {/* Instructions */}
-        <div style={{ 
-          fontSize: '0.8rem', 
-          opacity: 0.8,
-          borderTop: '1px solid rgba(255,255,255,0.2)',
-          paddingTop: '1rem'
-        }}>
-          <div style={{ marginBottom: '0.5rem' }}>
-            🎯 <strong>Collect MEV Detective cubes</strong> for points
-          </div>
-          <div style={{ marginBottom: '0.5rem' }}>
-            💥 <strong>Avoid Scam Token Hunter cubes</strong> (red, fast-moving)
-          </div>
-          <div style={{ marginBottom: '0.5rem' }}>
-            🎮 Move mouse to fly
-          </div>
-          <div style={{ marginBottom: '0.5rem' }}>
-            🐌 Other cubes move slower and pass by safely
-          </div>
-          <div>
-            ⚡ Higher risk = more points!
+
+        {/* Shield Section */}
+        <div style={{ marginBottom: '1rem' }}>
+          {/* Shield Status */}
+          {isShieldActive && (
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(0, 255, 255, 0.2) 0%, rgba(0, 150, 255, 0.2) 100%)',
+              border: '1px solid rgba(0, 255, 255, 0.4)',
+              borderRadius: '8px',
+              padding: '0.8rem',
+              marginBottom: '0.8rem',
+              textAlign: 'center',
+              boxShadow: '0 0 15px rgba(0, 255, 255, 0.3)'
+            }}>
+              <div style={{ 
+                fontSize: '1rem', 
+                fontWeight: 'bold',
+                color: '#00ffff',
+                marginBottom: '0.3rem'
+              }}>
+                🛡️ SHIELD ACTIVE
+              </div>
+              <div style={{ 
+                fontSize: '0.8rem', 
+                opacity: 0.8
+              }}>
+                Protection: {shieldTimeLeft}s remaining
+              </div>
+              <div style={{ 
+                fontSize: '0.7rem', 
+                opacity: 0.6,
+                marginTop: '0.2rem'
+              }}>
+                Blocking Toxic Predator & Pufferfish damage
+              </div>
+            </div>
+          )}
+
+          {/* Shield Purchase Button */}
+          <button
+            onClick={handleBuyShield}
+            disabled={score < 100 || isShieldActive}
+            style={{
+              width: '100%',
+              background: isShieldActive 
+                ? 'rgba(100, 100, 100, 0.3)' 
+                : score >= 100 
+                  ? 'linear-gradient(135deg, #00ffff 0%, #0096ff 100%)'
+                  : 'rgba(255, 255, 255, 0.2)',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '12px 16px',
+              color: isShieldActive ? 'rgba(255, 255, 255, 0.5)' : 'white',
+              fontSize: '0.9rem',
+              fontWeight: 'bold',
+              cursor: isShieldActive || score < 100 ? 'not-allowed' : 'pointer',
+              transition: 'all 0.3s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              opacity: isShieldActive || score < 100 ? 0.5 : 1
+            }}
+            onMouseEnter={(e) => {
+              if (!isShieldActive && score >= 100) {
+                e.target.style.boxShadow = '0 0 20px rgba(0, 255, 255, 0.4)'
+                e.target.style.transform = 'translateY(-1px)'
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isShieldActive && score >= 100) {
+                e.target.style.boxShadow = 'none'
+                e.target.style.transform = 'translateY(0)'
+              }
+            }}
+          >
+            <span style={{ fontSize: '1.1rem' }}>🛡️</span>
+            {isShieldActive 
+              ? 'Shield Active' 
+              : score >= 100 
+                ? 'Buy Shield (100 pts)' 
+                : `Need ${100 - score} more points`
+            }
+          </button>
+          
+          <div style={{ 
+            fontSize: '0.65rem', 
+            opacity: 0.6,
+            textAlign: 'center',
+            marginTop: '0.4rem'
+          }}>
+            💡 Shield protects against Toxic Predators & Pufferfish Traps for 10 seconds
           </div>
         </div>
+      
       </div>
       
       {/* Add CSS animations */}
@@ -979,6 +1417,63 @@ export default function AviatorGame({ characters, mousePos }) {
           0% { opacity: 0.3; }
           50% { opacity: 0.6; }
           100% { opacity: 0; }
+        }
+        @keyframes glitchEffect {
+          0% { 
+            opacity: 1; 
+            transform: translateX(0px);
+            filter: hue-rotate(0deg);
+          }
+          10% { 
+            opacity: 0.8; 
+            transform: translateX(2px);
+            filter: hue-rotate(90deg);
+          }
+          20% { 
+            opacity: 0.9; 
+            transform: translateX(-2px);
+            filter: hue-rotate(180deg);
+          }
+          30% { 
+            opacity: 0.7; 
+            transform: translateX(1px);
+            filter: hue-rotate(270deg);
+          }
+          40% { 
+            opacity: 1; 
+            transform: translateX(-1px);
+            filter: hue-rotate(360deg);
+          }
+          50% { 
+            opacity: 0.6; 
+            transform: translateX(3px);
+            filter: hue-rotate(180deg);
+          }
+          60% { 
+            opacity: 0.8; 
+            transform: translateX(-3px);
+            filter: hue-rotate(90deg);
+          }
+          70% { 
+            opacity: 0.9; 
+            transform: translateX(1px);
+            filter: hue-rotate(270deg);
+          }
+          80% { 
+            opacity: 0.7; 
+            transform: translateX(-1px);
+            filter: hue-rotate(0deg);
+          }
+          90% { 
+            opacity: 0.8; 
+            transform: translateX(2px);
+            filter: hue-rotate(180deg);
+          }
+          100% { 
+            opacity: 0; 
+            transform: translateX(0px);
+            filter: hue-rotate(0deg);
+          }
         }
       `}</style>
     </div>

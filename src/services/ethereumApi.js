@@ -5,8 +5,6 @@ import { scoreRisk } from '../utils/riskScoring.js';
 
 // Multi-chain API configuration
 const ETHERSCAN_API_KEY = import.meta.env.VITE_ETHERSCAN_API_KEY;
-const KATANA_RPC_URL = import.meta.env.VITE_KATANA_RPC_URL || 'https://katana-rpc.dojoengine.org';
-const KATANA_LOCAL_RPC = import.meta.env.VITE_KATANA_LOCAL_RPC || 'http://127.0.0.1:5050';
 
 // Chain configurations
 const CHAIN_CONFIGS = {
@@ -31,17 +29,13 @@ const CHAIN_CONFIGS = {
     ]
   },
   katana: {
-    chainId: 1001, // Katana testnet chain ID
+    chainId: 747474, // Katana chain ID for Etherscan V2
     name: 'Katana',
     symbol: 'ETH',
     apis: {
-      // Katana JSON-RPC endpoint (Starknet)
-      katana_rpc: KATANA_LOCAL_RPC, // Local Katana node
-      katana_explorer: 'https://explorer.katana.ronin.network/api',
-      // Public Katana RPC endpoints
-      katana_public: KATANA_RPC_URL,
-      // Fallback to simulated data if RPC unavailable
-      simulation: true
+      // Use Etherscan V2 API for Katana (unified endpoint)
+      etherscan_v2: 'https://api.etherscan.io/v2/api',
+      etherscan: 'https://api.etherscan.io/api'
     },
     popularAddresses: [
       '0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7', // ETH contract on Starknet
@@ -140,243 +134,220 @@ function withTimeout(promise, timeoutMs) {
   ]);
 }
 
-// Fetch Katana transactions from real RPC endpoints
+// Fetch Katana transactions using Etherscan V2 API only
 async function fetchKatanaTransactions(count) {
-  console.log(`🗡️ Fetching real Katana transactions from RPC (${count} requested)`);
+  console.log(`🗡️ Fetching Katana transactions from Etherscan V2 API (${count} requested)`);
   
-  const chainConfig = CHAIN_CONFIGS.katana;
-  const rpcEndpoints = [
-    chainConfig.apis.katana_public,
-    chainConfig.apis.katana_rpc, // Local node fallback
-  ];
-  
-  let lastError;
-  
-  // Try each RPC endpoint
-  for (const rpcUrl of rpcEndpoints) {
-    try {
-      console.log(`🔗 Trying Katana RPC endpoint: ${rpcUrl}`);
-      
-      const transactions = await fetchKatanaFromRpc(rpcUrl, count);
-      if (transactions && transactions.length > 0) {
-        console.log(`✅ Successfully fetched ${transactions.length} real Katana transactions`);
-        return transactions;
-      }
-    } catch (error) {
-      lastError = error;
-      console.log(`❌ Katana RPC endpoint ${rpcUrl} failed: ${error.message}`);
-      continue; // Try next endpoint
+  try {
+    // Use Etherscan V2 API with Katana chain ID (747474)
+    console.log('🌟 Fetching Katana via Etherscan V2 API (chainid=747474)...');
+    const etherscanData = await withTimeout(
+      fetchKatanaFromEtherscanV2(count),
+      15000 // 15 second timeout
+    );
+    if (etherscanData && etherscanData.length > 0) {
+      console.log(`✅ Success: Got ${etherscanData.length} transactions from Katana via Etherscan V2`);
+      return etherscanData;
     }
+  } catch (error) {
+    console.log('❌ Katana Etherscan V2 API failed:', error.message);
   }
   
-  // Fallback to simulated Katana data if all endpoints fail
-  console.log(`⚠️ All Katana RPC endpoints failed, using enhanced simulation. Last error: ${lastError?.message}`);
+  // Fallback to enhanced gaming-themed simulation if API fails
+  console.log(`⚠️ Katana Etherscan V2 API unavailable, using enhanced gaming simulation`);
   return await fetchKatanaSimulated(count);
 }
 
-// Fetch transactions from Katana RPC (Starknet JSON-RPC)
-async function fetchKatanaFromRpc(rpcUrl, count) {
+// Fetch Katana transactions using Etherscan V2 unified API
+async function fetchKatanaFromEtherscanV2(count) {
   try {
-    // First, get the latest block number
-    const latestBlockResponse = await fetch(rpcUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        method: 'starknet_blockNumber',
-        params: [],
-        id: 1
-      })
-    });
+    console.log(`🗡️ Fetching Katana transactions from Etherscan V2 API (chainid=747474)...`);
     
-    if (!latestBlockResponse.ok) {
-      throw new Error(`HTTP ${latestBlockResponse.status}: ${latestBlockResponse.statusText}`);
-    }
+    const chainConfig = CHAIN_CONFIGS.katana;
+    const chainId = chainConfig.chainId; // 747474
     
-    const latestBlockData = await latestBlockResponse.json();
-    
-    if (latestBlockData.error) {
-      throw new Error(`RPC Error: ${latestBlockData.error.message}`);
-    }
-    
-    const latestBlockNumber = latestBlockData.result;
-    console.log(`📦 Latest Katana block: ${latestBlockNumber}`);
-    
-    // Fetch recent blocks with transactions
+    // Try to get recent transactions from popular Katana addresses
+    const popularAddresses = chainConfig.popularAddresses;
     const allTransactions = [];
-    const blocksToFetch = Math.min(5, Math.floor(count / 2)); // Fetch fewer blocks for Katana
     
-    for (let i = 0; i < blocksToFetch && allTransactions.length < count; i++) {
-      const blockNumber = latestBlockNumber - i;
-      
+    for (const address of popularAddresses.slice(0, 2)) { // Try first 2 addresses
       try {
-        const blockResponse = await fetch(rpcUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            method: 'starknet_getBlockWithTxs',
-            params: [{ block_number: blockNumber }],
-            id: i + 2
-          })
-        });
+        const url = `${chainConfig.apis.etherscan_v2}?chainid=${chainId}&module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&page=1&offset=${Math.ceil(count / 2)}&sort=desc&apikey=${ETHERSCAN_API_KEY}`;
         
-        if (!blockResponse.ok) continue;
+        console.log(`🔍 Fetching from Katana address: ${address}`);
         
-        const blockData = await blockResponse.json();
+        const response = await fetch(url);
         
-        if (blockData.error || !blockData.result) {
-          console.log(`⚠️ Block ${blockNumber} error:`, blockData.error?.message || 'No result');
-          continue;
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
-        const block = blockData.result;
+        const data = await response.json();
         
-        if (block.transactions && block.transactions.length > 0) {
-          // Parse Katana/Starknet transactions
-          const blockTxs = block.transactions
-            .slice(0, Math.ceil(count / blocksToFetch))
-            .map(tx => parseKatanaTransaction(tx, block));
-          
-          allTransactions.push(...blockTxs);
-          console.log(`✅ Got ${blockTxs.length} transactions from Katana block ${blockNumber}`);
+        // Check for API-level errors
+        if (data.status !== "1") {
+          throw new Error(`Katana Etherscan API error: ${data.message || 'Unknown error'} (Status: ${data.status})`);
         }
-      } catch (blockError) {
-        console.log(`❌ Failed to fetch Katana block ${blockNumber}:`, blockError.message);
-        continue;
+        
+        // Check for valid data
+        if (data.result && Array.isArray(data.result) && data.result.length > 0) {
+          const katanaTransactions = data.result.map(tx => parseKatanaEtherscanTransaction(tx));
+          allTransactions.push(...katanaTransactions);
+          console.log(`✅ Got ${katanaTransactions.length} Katana transactions from ${address}`);
+        }
+        
+        if (allTransactions.length >= count) break;
+      } catch (error) {
+        console.log(`❌ Failed to fetch from Katana address ${address}:`, error.message);
+        continue; // Try next address
       }
     }
     
-    return allTransactions.slice(0, count);
+    if (allTransactions.length === 0) {
+      throw new Error('No Katana transactions found from Etherscan V2 API');
+    }
+    
+    // Sort by timestamp (newest first) and limit to requested count
+    const sortedTransactions = allTransactions
+      .sort((a, b) => parseInt(b.timeStamp || 0) - parseInt(a.timeStamp || 0))
+      .slice(0, count);
+      
+    console.log(`✅ Collected ${sortedTransactions.length} Katana transactions from Etherscan V2`);
+    return sortedTransactions;
     
   } catch (error) {
-    throw new Error(`Katana RPC failed: ${error.message}`);
+    throw new Error(`Katana Etherscan V2 failed: ${error.message}`);
   }
 }
 
-// Parse Katana/Starknet transaction data
-function parseKatanaTransaction(tx, block) {
+// Parse Katana transaction from Etherscan V2 API response
+function parseKatanaEtherscanTransaction(tx) {
   return {
-    id: `katana_${tx.transaction_hash}`,
-    hash: tx.transaction_hash,
-    from: tx.sender_address || tx.contract_address || 'Unknown',
-    to: tx.calldata && tx.calldata[0] ? tx.calldata[0] : 'Contract Call',
-    value: tx.calldata && tx.calldata[1] ? formatStarknetValue(tx.calldata[1]) : '0',
-    blockNumber: block.block_number,
-    gasUsed: parseInt(tx.max_fee || '0', 16) || 50000, // Starknet uses max_fee
-    gasPrice: 2, // Katana has very low gas prices
-    timestamp: new Date(block.timestamp * 1000).toISOString(),
-    typeHints: inferKatanaTransactionType(tx),
+    id: `katana_etherscan_${tx.hash}`,
+    hash: tx.hash,
+    from: tx.from,
+    to: tx.to,
+    value: (parseInt(tx.value || 0) / 1e18).toFixed(6), // Convert Wei to ETH
+    blockNumber: parseInt(tx.blockNumber || 0),
+    gasUsed: parseInt(tx.gasUsed || 0),
+    gasPrice: Math.round(parseInt(tx.gasPrice || 0) / 1e9), // Convert to Gwei
+    timestamp: new Date(parseInt(tx.timeStamp || 0) * 1000).toISOString(),
+    timeStamp: tx.timeStamp, // Keep original for sorting
+    typeHints: inferKatanaTransactionTypeFromEtherscan(tx),
+    functionName: tx.functionName || '',
+    methodId: tx.methodId || '',
     chain: 'katana',
-    starknet: {
-      version: tx.version,
-      nonce: tx.nonce,
-      signature: tx.signature,
-      calldata: tx.calldata,
-      type: tx.type
-    },
-    // Add game-specific analysis
-    ...analyzeKatanaTransaction(tx),
+    // Add Katana-specific analysis
+    ...analyzeKatanaEtherscanTransaction(tx),
     category: "Katana Transaction"
   };
 }
 
-// Helper function to format Starknet values
-function formatStarknetValue(hexValue) {
-  try {
-    if (typeof hexValue === 'string' && hexValue.startsWith('0x')) {
-      const value = parseInt(hexValue, 16);
-      return (value / 1e18).toFixed(6); // Convert from wei-like to readable format
-    }
-    return '0';
-  } catch {
-    return '0';
-  }
-}
-
-// Infer transaction type from Katana/Starknet transaction
-function inferKatanaTransactionType(tx) {
+// Infer transaction type for Katana from Etherscan data
+function inferKatanaTransactionTypeFromEtherscan(tx) {
   const types = [];
   
-  if (tx.type === 'INVOKE') {
-    types.push('Contract Call');
+  // Check function name from Etherscan
+  if (tx.functionName) {
+    const funcName = tx.functionName.toLowerCase();
     
-    // Analyze calldata to determine specific operations
-    if (tx.calldata && tx.calldata.length > 0) {
-      const selector = tx.calldata[0];
-      
-      // Common Starknet function selectors (simplified)
-      if (selector && typeof selector === 'string') {
-        if (selector.includes('transfer')) types.push('Transfer');
-        if (selector.includes('approve')) types.push('Approval');
-        if (selector.includes('swap')) types.push('Swap');
-        if (selector.includes('bridge')) types.push('Bridge');
-        if (selector.includes('mint') || selector.includes('nft')) types.push('NFT');
-        if (selector.includes('stake')) types.push('Staking');
-      }
-    }
-  } else if (tx.type === 'DEPLOY') {
-    types.push('Deploy');
-  } else if (tx.type === 'DECLARE') {
-    types.push('Declare');
+    if (funcName.includes('transfer')) types.push('Transfer');
+    if (funcName.includes('approve')) types.push('Approval');
+    if (funcName.includes('swap') || funcName.includes('exchange')) types.push('Swap');
+    if (funcName.includes('bridge')) types.push('Bridge');
+    if (funcName.includes('mint') || funcName.includes('nft')) types.push('NFT');
+    if (funcName.includes('stake')) types.push('Staking');
+    if (funcName.includes('game') || funcName.includes('play')) types.push('Gaming');
+  }
+  
+  // Check method ID for common functions
+  if (tx.methodId) {
+    const methodId = tx.methodId.toLowerCase();
+    
+    if (methodId === '0xa9059cbb') types.push('Transfer');
+    if (methodId === '0x095ea7b3') types.push('Approval');
+    if (methodId === '0x7ff36ab5' || methodId === '0x38ed1739') types.push('Swap');
+  }
+  
+  // Check if it's a simple ETH transfer
+  if (!tx.input || tx.input === '0x') {
+    types.push('Transfer');
+  }
+  
+  // Add gaming context for Katana
+  if (types.length === 0 || Math.random() < 0.6) {
+    types.push('Gaming');
   }
   
   return types.length > 0 ? types : ['Unknown'];
 }
 
-// Analyze Katana transaction for gaming patterns
-function analyzeKatanaTransaction(tx) {
+// Analyze Katana transaction from Etherscan data
+function analyzeKatanaEtherscanTransaction(tx) {
   const analysis = {};
   
-  // Check for gaming-related patterns
-  if (tx.calldata && tx.calldata.length > 0) {
-    // Gaming token detection
-    analysis.gaming = {
-      gameRelated: true,
-      gameTitle: detectGameFromCalldata(tx.calldata),
-      possibleGameAsset: Math.random() < 0.6
+  // Gaming analysis (common on Katana)
+  analysis.gaming = {
+    gameRelated: true,
+    gameTitle: detectGameFromTransaction(tx),
+    possibleGameAsset: Math.random() < 0.7
+  };
+  
+  // Bridge analysis
+  if (tx.functionName && tx.functionName.toLowerCase().includes('bridge')) {
+    analysis.bridge = {
+      sourceChain: "Ethereum",
+      targetChain: "Katana", 
+      bridgeType: "Asset Transfer",
+      verificationStatus: "Verified"
     };
-    
-    // Bridge analysis
-    if (tx.calldata.some(data => String(data).includes('bridge'))) {
-      analysis.bridge = {
-        sourceChain: Math.random() < 0.5 ? "Ethereum" : "Ronin",
-        targetChain: "Katana",
-        bridgeType: "Asset Transfer",
-        verificationStatus: "Verified"
-      };
-    }
-    
-    // NFT analysis
-    if (Math.random() < 0.3) {
-      analysis.nft = {
-        tokenId: Math.floor(Math.random() * 10000).toString(),
-        collection: "Katana Game Assets",
-        verified: true
-      };
-    }
   }
   
-  // Add realistic token information
+  // Token analysis
   analysis.token = {
-    name: ["ETH", "AXS", "SLP", "RON", "PIXEL"][Math.floor(Math.random() * 5)],
+    name: ["AXS", "SLP", "RON", "WETH", "PIXEL"][Math.floor(Math.random() * 5)],
     verified: true,
     contractAgeDays: Math.floor(Math.random() * 365) + 30,
-    liquidityUSD: Math.random() * 500000 + 50000
+    liquidityUSD: Math.random() * 300000 + 50000
   };
+  
+  // NFT analysis (common on gaming chains)
+  if (Math.random() < 0.4) {
+    analysis.nft = {
+      tokenId: Math.floor(Math.random() * 10000).toString(),
+      collection: "Katana Game Assets",
+      verified: true
+    };
+  }
+  
+  // Check for transaction failures
+  if (tx.isError === "1") {
+    analysis.error = {
+      failed: true,
+      reason: tx.txreceipt_status === "0" ? "Transaction failed" : "Unknown error"
+    };
+  }
   
   return analysis;
 }
 
-// Detect game from calldata patterns
-function detectGameFromCalldata(calldata) {
+// Detect game from transaction patterns
+function detectGameFromTransaction(tx) {
   const games = ["Axie Infinity", "Pixels", "Apeiron", "Lumiterra", "The Machines Arena"];
+  
+  // Try to infer from function name or address patterns
+  if (tx.functionName) {
+    const funcName = tx.functionName.toLowerCase();
+    if (funcName.includes('axie')) return "Axie Infinity";
+    if (funcName.includes('pixel')) return "Pixels";
+    if (funcName.includes('land')) return "Apeiron";
+  }
+  
+  // Default random selection
   return games[Math.floor(Math.random() * games.length)];
 }
+
+
 
 // Fallback to simulated Katana data
 async function fetchKatanaSimulated(count) {
@@ -1130,7 +1101,8 @@ export async function fetchAndAnalyzeTransactions(count = 10, chain = 'ethereum'
       console.log(`📊 Adding ${needed} enhanced risky transactions to meet target count`);
       
       const enhancedRiskyTxs = generateEnhancedRiskyTransactions(needed);
-      riskyTransactions.push(...enhancedRiskyTxs);
+      const parsedEnhancedTxs = enhancedRiskyTxs.map(parseTransactionData);
+      riskyTransactions.push(...parsedEnhancedTxs);
     }
     
     return riskyTransactions.slice(0, count);
@@ -1152,13 +1124,13 @@ function generateEnhancedRiskyTransactions(count) {
     const riskType = Math.random();
     let transaction;
     
-    if (riskType < 0.3) {
-      // Scam token transfer (guaranteed high risk)
+    if (riskType < 0.5) {
+      // Scam token transfer (guaranteed high risk) - Increased to 50%
       transaction = generateScamTokenTransaction(i, currentBlockNumber);
-    } else if (riskType < 0.5) {
+    } else if (riskType < 0.7) {
       // Infinite approval (guaranteed high risk)
       transaction = generateInfiniteApprovalTransaction(i, currentBlockNumber);
-    } else if (riskType < 0.8) {
+    } else if (riskType < 0.85) {
       // High slippage DEX swap (guaranteed high risk)
       transaction = generateHighSlippageSwap(i, currentBlockNumber);
     } else {
@@ -1178,7 +1150,7 @@ function generateEnhancedRiskyTransactions(count) {
 }
 
 function generateScamTokenTransaction(index, blockNumber) {
-  return {
+  const tx = {
     id: `risky_scam_${index}`,
     hash: `0x${Math.random().toString(16).substring(2, 10)}...${Math.random().toString(16).substring(2, 6)}`,
     from: generateRandomAddress(),
@@ -1198,6 +1170,8 @@ function generateScamTokenTransaction(index, blockNumber) {
     amount: Math.floor(Math.random() * 10000000).toString(),
     category: "Scam Token Transfer"
   };
+  console.log('🎯 Generated scam token transaction:', tx.id, 'TypeHints:', tx.typeHints, 'Token:', tx.token);
+  return tx;
 }
 
 function generateInfiniteApprovalTransaction(index, blockNumber) {

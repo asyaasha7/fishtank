@@ -151,13 +151,19 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
       let movementSpeed = 15; // Default speed
       
       if (character.name === "Toxic Predator") {
+        console.log("HERE WE ARE")
         movementSpeed = 15; // Keep same speed as default for dangerous cubes
         
         // Add vertical oscillation to make Toxic Predators more menacing
         const time = state.clock.getElapsedTime();
         const oscillationAmplitude = 1.5; // How far up/down they move
         const oscillationSpeed = 2.0; // How fast they oscillate
-        const uniqueOffset = character.id * 0.1; // Unique phase offset for each predator
+        // Create a numeric hash from the character ID for unique offset
+        let hash = 0;
+        for (let i = 0; i < character.id.length; i++) {
+          hash = ((hash << 5) - hash + character.id.charCodeAt(i)) & 0xffffffff;
+        }
+        const uniqueOffset = Math.abs(hash % 1000) * 0.001; // Unique phase offset for each predator
         
         currentPosition.current[1] += Math.sin(time * oscillationSpeed + uniqueOffset) * oscillationAmplitude * delta;
         
@@ -243,11 +249,20 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
     }
   })
 
+
+  console.log(character.name)
+  console.log('isCollected', isCollected)
   // Don't render if collected
   if (isCollected) return null
 
   const color = getColor(character.name)
-
+  console.log('get color ')
+  console.log(color)
+  
+  // Add position debugging for Toxic Predators
+  if (character.name === "Toxic Predator") {
+    console.log(`🦈 Rendering Toxic Predator at position:`, currentPosition.current)
+  }
   // Special shape for Treasure Jellyfish (diamond/crystal)
   if (character.name === "Treasure Jellyfish") {
     return (
@@ -507,24 +522,30 @@ function GameCubes({ characters, sphereRef, onCubeCollected, isShieldActive }) {
         const existingCount = cubeRegistry.size
         
         // Special positioning for specific creature types
-        let zPosition;
+        let zPosition, yPosition, xPosition;
+        
         if (character.name === "Treasure Jellyfish") {
           zPosition = 2 + (Math.random() - 0.5) * 0.5; // Same Z-axis as player (2) with small variance
+          yPosition = (Math.random() - 0.5) * 4; // -2 to +2 range
+          xPosition = 12 + Math.random() * 5 + (index - existingCount) * 2; // Closer to screen
         } else if (character.name === "Toxic Predator") {
-          zPosition = 2 + (Math.random() - 0.5) * 1.0; // Close to player but with more variance for hunting
+          zPosition = 2 + (Math.random() - 0.5) * 0.4; // Similar to pufferfish but slightly tighter
+          yPosition = (Math.random() - 0.5) * 3.5; // Slightly smaller Y range for more focused threat
+          xPosition = 11 + Math.random() * 6 + (index - existingCount) * 2; // Start slightly closer for more aggressive approach
+          console.log(`🦈 Positioning Toxic Predator ${character.id} at [${xPosition}, ${yPosition}, ${zPosition}]`);
         } else if (character.name === "Pufferfish Trap") {
           zPosition = 2 + (Math.random() - 0.5) * 0.5; // Same Z-axis as player (2) for reliable collision
+          yPosition = (Math.random() - 0.5) * 4; // -2 to +2 range
+          xPosition = 12 + Math.random() * 5 + (index - existingCount) * 2; // Closer to screen
         } else {
           zPosition = (Math.random() - 0.5) * 4; // Normal random Z positioning for other cubes
+          yPosition = (Math.random() - 0.5) * 6; // Normal Y range
+          xPosition = 15 + Math.random() * 8 + (index - existingCount) * 4; // Normal X position
         }
         
         newRegistry.set(character.id, {
           character,
-          position: [
-            15 + Math.random() * 8 + (index - existingCount) * 4, // Start further right for new cubes
-            (Math.random() - 0.5) * 6,
-            zPosition
-          ],
+          position: [xPosition, yPosition, zPosition],
           speed: 0.8 + Math.random() * 1.2,
           scale: character.name === "MEV Detective" ? 1.2 : (0.6 + Math.random() * 0.4)
         })
@@ -557,7 +578,7 @@ function GameCubes({ characters, sphereRef, onCubeCollected, isShieldActive }) {
 }
 
 // Game scene with all components
-function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealthUpdate, isShieldActive }) {
+function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealthUpdate, onHealthUpdateNoFlash, isShieldActive }) {
   const sphereRef = useRef()
   const [particles, setParticles] = useState([])
 
@@ -636,7 +657,7 @@ function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealth
         
         // Update UI without damage flash
         onLifeUpdate(gameState.lives)
-        setHealth(gameState.health)
+        onHealthUpdateNoFlash(gameState.health)
         
         // Also lose some points
         const pointsLost = Math.min(10, gameState.score); // Lose 10 points or current score if less
@@ -798,6 +819,15 @@ export default function FishtankGame({ characters, mousePos }) {
     // Trigger damage flash effect
     setDamageFlash(true)
     setTimeout(() => setDamageFlash(false), 200)
+  }
+
+  const handleHealthUpdateNoFlash = (newHealth) => {
+    setHealth(newHealth)
+    
+    // Check for game over without damage flash
+    if (gameState.isGameOver) {
+      setIsGameOver(true)
+    }
   }
 
   const handleBuyShield = () => {
@@ -977,6 +1007,7 @@ export default function FishtankGame({ characters, mousePos }) {
           onScoreUpdate={handleScoreUpdate}
           onLifeUpdate={handleLifeUpdate}
           onHealthUpdate={handleHealthUpdate}
+          onHealthUpdateNoFlash={handleHealthUpdateNoFlash}
           isShieldActive={isShieldActive}
         />
       </Canvas>

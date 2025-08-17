@@ -291,19 +291,12 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
   })
 
 
-  console.log(character.name)
-  console.log('isCollected', isCollected)
   // Don't render if collected
   if (isCollected) return null
 
   const color = getColor(character.name)
-  console.log('get color ')
-  console.log(color)
-  
-  // Add position debugging for Toxic Predators
-  if (character.name === "Toxic Predator") {
-    console.log(`🦈 Rendering Toxic Predator at position:`, currentPosition.current)
-  }
+
+
   // Special shape for Treasure Jellyfish (diamond/crystal)
   if (character.name === "Treasure Jellyfish") {
     return (
@@ -435,7 +428,6 @@ function GameCubes({ characters, sphereRef, onCubeCollected, isShieldActive, isP
           zPosition = 2 + (Math.random() - 0.5) * 0.4; // Similar to pufferfish but slightly tighter
           yPosition = (Math.random() - 0.5) * 3.5; // Slightly smaller Y range for more focused threat
           xPosition = 11 + Math.random() * 6 + (index - existingCount) * 2; // Start slightly closer for more aggressive approach
-          console.log(`🦈 Positioning Toxic Predator ${character.id} at [${xPosition}, ${yPosition}, ${zPosition}]`);
         } else if (character.name === "Pufferfish Trap") {
           zPosition = 2 + (Math.random() - 0.5) * 0.5; // Same Z-axis as player (2) for reliable collision
           yPosition = (Math.random() - 0.5) * 4; // -2 to +2 range
@@ -485,7 +477,7 @@ function GameCubes({ characters, sphereRef, onCubeCollected, isShieldActive, isP
 function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealthUpdate, onHealthUpdateNoFlash, isShieldActive, isPaused }) {
   const sphereRef = useRef()
   const [particles, setParticles] = useState([])
-
+  const [glitchEffect, setGlitchEffect] = useState(false)
   const handleCubeCollected = (character, position, type = 'collect') => {
     if (character.name === "Treasure Jellyfish") {
       // Add points for collecting MEV Detective
@@ -676,7 +668,7 @@ export default function FishtankGame({
   const [isGameOver, setIsGameOver] = useState(false)
   const [isRiskTypesCollapsed, setIsRiskTypesCollapsed] = useState(false)
   const [glitchEffect, setGlitchEffect] = useState(false)
-
+  const [over, setOver] = useState(false)
   // Sync local state with props when they change
   React.useEffect(() => {
     setScore(gameScore || 0)
@@ -806,16 +798,25 @@ export default function FishtankGame({
     setGameScore(0)
     setGameHealth(8)
     setGameLives(3)
+    setOver(false)
   }
 
   // Monitor game state for game over condition
   useEffect(() => {
     const checkGameOver = () => {
-      if (gameState.isGameOver && !isGameOver) {
+      console.log(')))))000000000000')
+      console.log('gameState.isGameOver', gameState.isGameOver)
+      console.log('--isGameOver', isGameOver)
+      console.log('--over', over)
+      console.log('---------------/')
+      console.log('---------------/')
+      console.log('-----------------/')
+      if (gameState.isGameOver & !over) {
         // Use the stored final score instead of current score
         const finalScore = gameState.finalScore || score
         console.log('🎮 Game over detected - calling onGameOver with final score:', finalScore)
         setIsGameOver(true)
+        setOver(true)
         // Call the blockchain score submission with final score
         if (onGameOver) {
           onGameOver(finalScore, health, lives)

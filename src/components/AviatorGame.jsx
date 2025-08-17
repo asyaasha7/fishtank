@@ -416,7 +416,8 @@ function GameCubes({ characters, sphereRef, onCubeCollected, isShieldActive }) {
 function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealthUpdate, onHealthUpdateNoFlash, isShieldActive }) {
   const sphereRef = useRef()
   const [particles, setParticles] = useState([])
-
+  const [glitchEffect, setGlitchEffect] = useState(false)
+  
   const handleCubeCollected = (character, position, type = 'collect') => {
     if (character.name === "Treasure Jellyfish") {
       // Add points for collecting MEV Detective

@@ -6,6 +6,13 @@ import { scoreRisk } from '../utils/riskScoring.js';
 // Multi-chain API configuration
 const ETHERSCAN_API_KEY = import.meta.env.VITE_ETHERSCAN_API_KEY;
 
+// Debug API key loading (can be removed once confirmed working)
+if (!ETHERSCAN_API_KEY) {
+  console.warn('⚠️ VITE_ETHERSCAN_API_KEY not found. Katana transactions will use simulation only.');
+} else {
+  console.log('✅ Etherscan API key loaded successfully');
+}
+
 // Chain configurations
 const CHAIN_CONFIGS = {
   ethereum: {
@@ -29,11 +36,13 @@ const CHAIN_CONFIGS = {
     ]
   },
   katana: {
-    chainId: 747474, // Katana chain ID for Etherscan V2
+    chainId: 129399, // Katana Tatara testnet chain ID
     name: 'Katana',
     symbol: 'ETH',
     apis: {
-      // Use Etherscan V2 API for Katana (unified endpoint)
+      // Native Katana Tatara testnet API (Conduit-based explorer)
+      explorer: 'https://explorer-tatara-s4atxtv7sq.t.conduit.xyz/api/v2',
+      // Fallback to Etherscan V2 API if needed
       etherscan_v2: 'https://api.etherscan.io/v2/api',
       etherscan: 'https://api.etherscan.io/api'
     },
@@ -41,6 +50,10 @@ const CHAIN_CONFIGS = {
       '0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7', // ETH contract on Starknet
       '0x005a643907b9a4bc6a55e9069c4fd5fd1f5c79a22470690f75556c4736e34426', // Example bridge contract
       '0x068f5c6a61780768455de69077e07e89787839bf8166decfbf92b645209c0fb8', // Example DEX contract
+      '0x467397d1d298c1a4ca9bfe87565ef04486c25c0f', // Your Fishtank contract
+      '0x080332bc8eded68ff40610f54c90396efa593fd8', // Active address from logs
+      '0x742a4a9F23E8C14e8C20320E6e0B3E9e2DF5A5F8', // Refill receiver address
+      '0x18070d824952fb5d46f529659bdb497ebb1c5985', // Another active address from logs
     ]
   }
 };
@@ -134,13 +147,28 @@ function withTimeout(promise, timeoutMs) {
   ]);
 }
 
-// Fetch Katana transactions using Etherscan V2 API only
+// Fetch Katana transactions using native API, Etherscan V2 fallback, and simulation
 async function fetchKatanaTransactions(count) {
-  console.log(`🗡️ Fetching Katana transactions from Etherscan V2 API (${count} requested)`);
+  console.log(`🗡️ Fetching Katana transactions (${count} requested)`);
   
+  // First try: Native Katana Tatara API
   try {
-    // Use Etherscan V2 API with Katana chain ID (747474)
-    console.log('🌟 Fetching Katana via Etherscan V2 API (chainid=747474)...');
+    console.log('🌟 Fetching Katana via native Tatara API...');
+    const nativeData = await withTimeout(
+      fetchKatanaFromNativeAPI(count),
+      15000 // 15 second timeout
+    );
+    if (nativeData && nativeData.length > 0) {
+      console.log(`✅ Success: Got ${nativeData.length} transactions from Katana native API`);
+      return nativeData;
+    }
+  } catch (error) {
+    console.log('❌ Katana native API failed:', error.message);
+  }
+  
+  // Second try: Etherscan V2 API fallback
+  try {
+    console.log('🌟 Fallback: Fetching Katana via Etherscan V2 API (chainid=129399)...');
     const etherscanData = await withTimeout(
       fetchKatanaFromEtherscanV2(count),
       15000 // 15 second timeout
@@ -153,24 +181,183 @@ async function fetchKatanaTransactions(count) {
     console.log('❌ Katana Etherscan V2 API failed:', error.message);
   }
   
-  // Fallback to enhanced gaming-themed simulation if API fails
-  console.log(`⚠️ Katana Etherscan V2 API unavailable, using enhanced gaming simulation`);
+  // Final fallback: Enhanced gaming-themed simulation
+  console.log(`⚠️ All Katana APIs unavailable, using enhanced gaming simulation`);
   return await fetchKatanaSimulated(count);
+}
+
+// Fetch Katana transactions using native Tatara API
+async function fetchKatanaFromNativeAPI(count) {
+  try {
+    console.log(`🗡️ Fetching Katana transactions from native Tatara API...`);
+    
+    const chainConfig = CHAIN_CONFIGS.katana;
+    const baseUrl = chainConfig.apis.explorer;
+    
+    // Try fetching recent transactions from multiple endpoints
+    const allTransactions = [];
+    
+    // Method 1: Use proxy through local server to bypass CORS  
+    const possibleEndpoints = [
+      `/api/transactions?limit=${count}`, // Proxy through local server (now using Blockscout)
+    ];
+    
+    for (const url of possibleEndpoints) {
+      try {
+        console.log(`🔍 Trying endpoint: ${url}`);
+        
+        const response = await fetch(url);
+        if (!response.ok) {
+          console.log(`❌ ${url} failed with ${response.status}: ${response.statusText}`);
+          continue;
+        }
+        
+        const data = await response.json();
+        console.log(`📦 Success with ${url}, response:`, data);
+        
+        // Process the response - server proxy already extracts the items array
+        let transactions = [];
+        if (Array.isArray(data)) {
+          // Direct array response from server proxy
+          transactions = data;
+        } else if (data.items) {
+          transactions = data.items;
+        } else if (data.transactions) {
+          transactions = data.transactions;
+        } else if (data.result) {
+          transactions = data.result;
+        }
+        
+        if (transactions && transactions.length > 0) {
+          console.log(`✅ Found ${transactions.length} transactions from native API endpoint: ${url}`);
+          
+          // Transform Conduit Explorer API format to our standard format
+          const transformedTxs = transactions.slice(0, count).map((tx, index) => {
+            return {
+              hash: tx.hash || `0x${Math.random().toString(16).substring(2, 10)}...`,
+              from: tx.from?.hash || tx.from_address || chainConfig.popularAddresses[0],
+              to: tx.to?.hash || tx.to_address || chainConfig.popularAddresses[1],
+              value: tx.value || (Math.random() * 10).toFixed(6),
+              blockNumber: tx.block_number || (1000000 + index),
+              timeStamp: tx.timestamp ? new Date(tx.timestamp).getTime() / 1000 : Math.floor(Date.now() / 1000) - (index * 60),
+              methodId: tx.decoded_input?.method_id || tx.raw_input?.substring(0, 10) || '0x',
+              functionName: tx.method || tx.decoded_input?.method_call?.split('(')[0] || 'Transfer',
+              isError: tx.status === 'error' || tx.result === 'error' ? '1' : '0',
+              typeHints: assignKatanaTypeHints(tx)
+            };
+          });
+          
+          return transformedTxs;
+        }
+      } catch (error) {
+        console.log(`❌ Endpoint ${url} failed: ${error.message}`);
+      }
+    }
+    
+    // Method 2: Try fetching from specific addresses if general endpoint fails
+    const popularAddresses = chainConfig.popularAddresses;
+    for (const address of popularAddresses.slice(0, 3)) {
+      const addressEndpoints = [
+        `${baseUrl}/addresses/${address}/transactions?limit=${Math.ceil(count / 3)}`,
+        `${baseUrl}/accounts/${address}/transactions?limit=${Math.ceil(count / 3)}`,
+        `${baseUrl}/address/${address}/transactions?limit=${Math.ceil(count / 3)}`,
+        `${baseUrl}/addresses/${address}/txs?limit=${Math.ceil(count / 3)}`,
+        `${baseUrl}/address/${address}/txs?limit=${Math.ceil(count / 3)}`
+      ];
+      
+      for (const url of addressEndpoints) {
+        try {
+          console.log(`🔍 Fetching from address ${address} via: ${url}`);
+          
+          const response = await fetch(url);
+          if (!response.ok) {
+            console.log(`❌ ${url} failed with ${response.status}`);
+            continue;
+          }
+          
+          const data = await response.json();
+          let transactions = Array.isArray(data) ? data : data.items || data.transactions || data.result || [];
+          
+          if (transactions.length > 0) {
+            console.log(`✅ Found ${transactions.length} transactions for address ${address}`);
+            const transformedTxs = transactions.map((tx, index) => ({
+              hash: tx.hash || `0x${Math.random().toString(16).substring(2, 10)}...`,
+              from: tx.from?.hash || tx.from_address || address,
+              to: tx.to?.hash || tx.to_address || chainConfig.popularAddresses[1],
+              value: tx.value || (Math.random() * 10).toFixed(6),
+              blockNumber: tx.block_number || (1000000 + index),
+              timeStamp: tx.timestamp ? new Date(tx.timestamp).getTime() / 1000 : Math.floor(Date.now() / 1000) - (index * 60),
+              methodId: tx.decoded_input?.method_id || tx.raw_input?.substring(0, 10) || '0x',
+              functionName: tx.method || tx.decoded_input?.method_call?.split('(')[0] || 'Transfer',
+              isError: tx.status === 'error' || tx.result === 'error' ? '1' : '0',
+              typeHints: assignKatanaTypeHints(tx)
+            }));
+            
+            allTransactions.push(...transformedTxs);
+            break; // Found working endpoint for this address
+          }
+        } catch (error) {
+          console.log(`❌ Address endpoint ${url} failed: ${error.message}`);
+        }
+      }
+    }
+    
+    if (allTransactions.length > 0) {
+      console.log(`✅ Got ${allTransactions.length} transactions from native API address queries`);
+      return allTransactions.slice(0, count);
+    }
+    
+    throw new Error('No transactions found from native API');
+    
+  } catch (error) {
+    console.log(`❌ Native Katana API error: ${error.message}`);
+    throw error;
+  }
+}
+
+// Helper function to assign type hints for Katana transactions
+function assignKatanaTypeHints(tx) {
+  const methodId = tx.method_id || tx.input?.substring(0, 10) || '';
+  const functionName = (tx.function_name || '').toLowerCase();
+  const txType = (tx.type || '').toLowerCase();
+  
+  // Katana-specific type detection
+  if (functionName.includes('bridge') || txType.includes('bridge')) {
+    return ['Bridge', 'Cross-chain'];
+  } else if (functionName.includes('swap') || functionName.includes('exchange')) {
+    return ['Swap', 'DeFi'];
+  } else if (functionName.includes('stake') || functionName.includes('delegate')) {
+    return ['Staking', 'DeFi'];
+  } else if (functionName.includes('mint') || functionName.includes('claim')) {
+    return ['Mint', 'NFT'];
+  } else if (methodId === '0xa9059cbb' || functionName.includes('transfer')) {
+    return ['Transfer'];
+  } else if (functionName.includes('game') || tx.to === CHAIN_CONFIGS.katana.popularAddresses[3]) {
+    return ['Gaming', 'Contract'];
+  } else {
+    return ['Contract', 'Unknown'];
+  }
 }
 
 // Fetch Katana transactions using Etherscan V2 unified API
 async function fetchKatanaFromEtherscanV2(count) {
   try {
-    console.log(`🗡️ Fetching Katana transactions from Etherscan V2 API (chainid=747474)...`);
+    console.log(`🗡️ Fetching Katana transactions from Etherscan V2 API (chainid=129399)...`);
     
     const chainConfig = CHAIN_CONFIGS.katana;
-    const chainId = chainConfig.chainId; // 747474
+    const chainId = chainConfig.chainId; // 129399
+    
+    // Check if we have an API key, if not, skip this method
+    if (!ETHERSCAN_API_KEY) {
+      console.log('⚠️ No Etherscan API key found. Set VITE_ETHERSCAN_API_KEY environment variable.');
+      throw new Error('Missing Etherscan API key. Get one at https://etherscan.io/apis');
+    }
     
     // Try to get recent transactions from popular Katana addresses
     const popularAddresses = chainConfig.popularAddresses;
     const allTransactions = [];
     
-    for (const address of popularAddresses.slice(0, 2)) { // Try first 2 addresses
+    for (const address of popularAddresses.slice(0, 4)) { // Try first 4 addresses
       try {
         const url = `${chainConfig.apis.etherscan_v2}?chainid=${chainId}&module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&page=1&offset=${Math.ceil(count / 2)}&sort=desc&apikey=${ETHERSCAN_API_KEY}`;
         

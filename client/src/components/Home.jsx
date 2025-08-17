@@ -335,6 +335,7 @@ function Home() {
   };
 
   const onGameOver = async (finalScore, finalHealth, finalLives) => {
+    console.log('!!!wallet.address', wallet.address)
     if (!wallet.address) return;
     
     try {
@@ -351,7 +352,6 @@ function Home() {
       
     } catch (error) {
       console.error('Failed to submit score:', error);
-      alert(`Failed to submit score: ${error.message}`);
     }
   };
 

@@ -1030,18 +1030,10 @@ export default function FishtankGame({
         fontSize: '0.8rem',
         color: '#e0e0e0'
       }}>
-        <div style={{ 
-          color: '#74b9ff', 
-          fontWeight: 'bold', 
-          marginBottom: '0.5rem',
-          fontSize: '0.85rem'
-        }}>
-          📊 Data Status
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+        <div style={{ display: 'flex', gap: '0.3rem' }}>
           {loading && (
             <div style={{ 
-              fontSize: '0.75rem',
+              fontSize: '1rem',
               opacity: 0.8,
               color: '#00ffff',
               display: 'flex',
@@ -1061,7 +1053,7 @@ export default function FishtankGame({
           )}
           {!loading && (
             <div style={{ 
-              fontSize: '0.75rem',
+              fontSize: '1rem',
               opacity: 0.8,
               color: '#00b894'
             }}>

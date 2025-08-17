@@ -97,14 +97,15 @@ export function usePlayerState(playerAddress: string | null) {
         setError(null);
         
         const contract = fishtankRO();
-        const state = await contract.playerStates(playerAddress);
+        const playerData = await contract.getPlayer(playerAddress);
         
         if (mounted) {
           setPlayerState({
-            score: state.score.toString(),
-            health: state.health.toString(),
-            lives: state.lives.toString(),
-            level: state.level.toString()
+            bestScore: playerData.bestScore.toString(),
+            lastScore: playerData.lastScore.toString(),
+            runs: playerData.runs.toString(),
+            lastPlayedAt: playerData.lastPlayedAt.toString(),
+            lastRunId: playerData.lastRunId
           });
         }
       } catch (err) {
@@ -204,17 +205,13 @@ export function useFishtankData(playerAddress: string | null) {
   }};
 }
 
-// Additional types for leaderboard
+// Additional types for leaderboard (updated for simplified contract)
 export interface LeaderboardEntry {
   rank: number;
   player: string;
   address: string;
   displayAddress: string;
   score: number;
-  health: number;
-  lives: number;
-  blockNumber: number;
-  transactionHash: string;
 }
 
 export interface LeaderboardData {

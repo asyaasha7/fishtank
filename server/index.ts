@@ -31,6 +31,28 @@ const signerPrivateKey = process.env.SIGNER_PK && process.env.SIGNER_PK.length =
 const reporterWallet = new ethers.Wallet(reporterPrivateKey, provider);
 const signerWallet = new ethers.Wallet(signerPrivateKey, provider);
 
+// Note: The ABI file should contain just the ABI array, not the full Remix output
+// For now, we'll handle the ABI format gracefully
+let contractABI: any;
+try {
+  // Try to extract ABI from the imported JSON
+  contractABI = FishtankGameStateABI.abi || FishtankGameStateABI;
+} catch {
+  // Fallback to a minimal ABI for the simplified contract
+  contractABI = [
+    "function difficulty() view returns (uint8)",
+    "function getPlayer(address) view returns (tuple(uint64 bestScore, uint64 lastScore, uint32 runs, uint64 lastPlayedAt, bytes32 lastRunId))",
+    "function getTop5() view returns (address[5], uint64[5])",
+    "function submitScore(uint64 score, bytes32 runId, uint64 startedAt, uint64 endedAt)"
+  ];
+}
+
+const fishtankContract = new ethers.Contract(
+  process.env.FISHTANK_ADDR!,
+  contractABI,
+  reporterWallet
+);
+
 console.log('🔧 Server setup:');
 console.log('📡 RPC:', process.env.KATANA_RPC);
 console.log('🏠 Contract:', process.env.FISHTANK_ADDR);
@@ -48,37 +70,12 @@ console.log('✍️ Signer:', signerWallet.address);
     // Test contract connectivity
     const difficulty = await fishtankContract.difficulty();
     console.log('🎯 Contract difficulty:', difficulty.toString());
-  } catch (error) {
-    console.warn('⚠️  Initial setup check failed:', error.message);
+  } catch (error: any) {
+    console.warn('⚠️  Initial setup check failed:', error?.message || error);
   }
 })();
 
-const fishtankContract = new ethers.Contract(
-  process.env.FISHTANK_ADDR!,
-  FishtankGameStateABI,
-  reporterWallet
-);
-
-// EIP-712 Domain for signature verification
-const domain = {
-  name: "FishtankGameState",
-  version: "1",
-  chainId: parseInt(process.env.KATANA_CHAIN_ID!),
-  verifyingContract: process.env.FISHTANK_ADDR!
-};
-
-const types = {
-  ScoreApproval: [
-    { name: "player", type: "address" },
-    { name: "score", type: "uint64" },
-    { name: "runId", type: "bytes32" },
-    { name: "difficultyHint", type: "uint8" },
-    { name: "startedAt", type: "uint64" },
-    { name: "endedAt", type: "uint64" },
-    { name: "nonce", type: "uint256" },
-    { name: "deadline", type: "uint256" }
-  ]
-};
+// No more EIP-712 signatures needed for the simplified contract
 
 // Routes
 
@@ -96,33 +93,35 @@ app.get('/api/fishtank/player/:addr', async (req, res) => {
       return res.status(400).json({ error: 'Invalid address' });
     }
 
-    const playerState = await fishtankContract.playerStates(addr);
+    const playerData = await fishtankContract.getPlayer(addr);
     const difficulty = await fishtankContract.difficulty();
 
     res.json({
       player: addr,
       state: {
-        score: playerState.score.toString(),
-        health: playerState.health.toString(),
-        lives: playerState.lives.toString(),
-        level: playerState.level.toString()
+        bestScore: playerData.bestScore.toString(),
+        lastScore: playerData.lastScore.toString(),
+        runs: playerData.runs.toString(),
+        lastPlayedAt: playerData.lastPlayedAt.toString(),
+        lastRunId: playerData.lastRunId
       },
       difficulty: difficulty.toString()
     });
-  } catch (error) {
-    console.error('Error fetching player state:', error.message);
+  } catch (error: any) {
+    console.error('Error fetching player state:', error?.message || error);
     
     // Handle specific contract errors gracefully
-    if (error.message.includes('missing revert data') || error.message.includes('execution reverted')) {
+    if (error?.message?.includes('missing revert data') || error?.message?.includes('execution reverted')) {
       // Player likely doesn't exist in contract yet, return default state
       const { addr } = req.params;
       res.json({
         player: addr,
         state: {
-          score: '0',
-          health: '0',
-          lives: '0',
-          level: '0'
+          bestScore: "0",
+          lastScore: "0",
+          runs: "0",
+          lastPlayedAt: "0",
+          lastRunId: "0x0000000000000000000000000000000000000000000000000000000000000000"
         },
         difficulty: '2' // Default difficulty
       });
@@ -146,47 +145,30 @@ app.get('/api/fishtank/difficulty', async (req, res) => {
 // Get leaderboard data
 app.get('/api/fishtank/leaderboard', async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit as string) || 10;
+    const limit = parseInt(req.query.limit as string) || 5; // Max 5 for Top5 contract
     
-    // Get all ScoreSubmitted events from the contract
-    const filter = fishtankContract.filters.ScoreSubmitted();
-    const events = await fishtankContract.queryFilter(filter, -10000); // Last 10k blocks
+    // Get Top5 leaderboard directly from contract
+    const [addresses, scores] = await fishtankContract.getTop5();
     
-    // Process events to create leaderboard
-    const playerScores = new Map();
-    
-    events.forEach(event => {
-      const { player, score, health, lives } = event.args;
-      const playerAddr = player.toLowerCase();
-      const scoreValue = parseInt(score.toString());
-      
-      // Keep the highest score for each player
-      if (!playerScores.has(playerAddr) || playerScores.get(playerAddr).score < scoreValue) {
-        playerScores.set(playerAddr, {
-          player: player,
-          score: scoreValue,
-          health: parseInt(health.toString()),
-          lives: parseInt(lives.toString()),
-          blockNumber: event.blockNumber,
-          transactionHash: event.transactionHash
+    // Build leaderboard array, filtering out empty slots
+    const leaderboard = [];
+    for (let i = 0; i < Math.min(addresses.length, limit); i++) {
+      if (addresses[i] !== ethers.ZeroAddress && scores[i] > 0) {
+        leaderboard.push({
+          rank: i + 1,
+          player: addresses[i],
+          address: addresses[i],
+          displayAddress: `${addresses[i].slice(0, 6)}...${addresses[i].slice(-4)}`,
+          score: parseInt(scores[i].toString())
         });
       }
-    });
+    }
     
-    // Convert to array and sort by score (descending)
-    const leaderboard = Array.from(playerScores.values())
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit)
-      .map((entry, index) => ({
-        rank: index + 1,
-        ...entry,
-        address: entry.player,
-        displayAddress: `${entry.player.slice(0, 6)}...${entry.player.slice(-4)}`
-      }));
+    console.log(`📊 Top5 Leaderboard requested (limit: ${limit}), found ${leaderboard.length} entries`);
     
     res.json({
       leaderboard,
-      totalPlayers: playerScores.size,
+      totalPlayers: leaderboard.length,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
@@ -257,7 +239,7 @@ app.post('/api/fishtank/event/health', async (req, res) => {
   }
 });
 
-// Submit score with EIP-712 ScoreApproval (Reporter path)
+// Submit score using simplified contract method (players call directly)
 app.post('/api/fishtank/score/submit', async (req, res) => {
   try {
     const { player, score } = req.body;
@@ -272,67 +254,25 @@ app.post('/api/fishtank/score/submit', async (req, res) => {
 
     console.log(`🏆 Submitting score: ${player}, score: ${score}`);
 
-    // Read the player's nonce from the contract
-    const nonce = await fishtankContract.nonces(player);
-    console.log(`📋 Player nonce: ${nonce}`);
-
-    // Get current difficulty
-    const difficultyHint = Number(await fishtankContract.difficulty());
-    console.log(`🎯 Difficulty hint: ${difficultyHint}`);
-
     // Create timestamps
     const now = Math.floor(Date.now() / 1000);
     const startedAt = now - 60; // Assume game started 1 minute ago
     const endedAt = now;
-    const deadline = now + 600; // 10 minutes from now
 
-    // Generate unique runId
+    // Generate unique runId based on player and timestamp
     const runId = keccak256(toUtf8Bytes(`run:${player}:${Date.now()}`));
     console.log(`🎮 Run ID: ${runId}`);
 
-    // Build EIP-712 ScoreApproval
-    const approval = {
-      player,
-      score: BigInt(score),
+    // Submit score directly to the contract using the reporterWallet
+    // Note: In production, players would call this directly from their wallets
+    const gasLimit = 200000; // Gas limit for the simple submitScore call
+    const tx = await fishtankContract.submitScore(
+      BigInt(score),
       runId,
-      difficultyHint,
-      startedAt: BigInt(startedAt),
-      endedAt: BigInt(endedAt),
-      nonce: BigInt(nonce),
-      deadline: BigInt(deadline)
-    };
-
-    console.log('📝 Score approval:', approval);
-
-    // Sign with the Signer key
-    const signature = await signerWallet.signTypedData(domain, types, approval);
-    console.log(`✍️  Signature: ${signature}`);
-
-    // Check roles (for debugging)
-    try {
-      const signerRole = await fishtankContract.SIGNER_ROLE();
-      const reporterRole = await fishtankContract.REPORTER_ROLE();
-      const hasSignerRole = await fishtankContract.hasRole(signerRole, signerWallet.address);
-      const hasReporterRole = await fishtankContract.hasRole(reporterRole, reporterWallet.address);
-      
-      console.log(`🔐 Signer role check: ${signerWallet.address} has SIGNER_ROLE: ${hasSignerRole}`);
-      console.log(`🔐 Reporter role check: ${reporterWallet.address} has REPORTER_ROLE: ${hasReporterRole}`);
-      
-      if (!hasSignerRole) {
-        console.warn(`⚠️  Warning: Signer wallet ${signerWallet.address} does not have SIGNER_ROLE`);
-      }
-      if (!hasReporterRole) {
-        console.warn(`⚠️  Warning: Reporter wallet ${reporterWallet.address} does not have REPORTER_ROLE`);
-      }
-    } catch (roleError) {
-      console.log(`🔍 Role check failed:`, roleError.message);
-    }
-
-    // Submit using submitScoreByReporter (gasless for players)
-    const gasLimit = 300000; // Increased gas limit for reporter call
-    const tx = await fishtankContract.submitScoreByReporter(approval, signature, {
-      gasLimit: gasLimit
-    });
+      BigInt(startedAt),
+      BigInt(endedAt),
+      { gasLimit: gasLimit }
+    );
     console.log(`📡 Transaction sent: ${tx.hash}`);
     
     const receipt = await tx.wait();
@@ -342,38 +282,33 @@ app.post('/api/fishtank/score/submit', async (req, res) => {
       success: true,
       txHash: receipt.hash,
       blockNumber: receipt.blockNumber,
-      signature,
-      approval: {
-        player: approval.player,
-        score: approval.score.toString(),
-        runId: approval.runId,
-        difficultyHint: approval.difficultyHint,
-        startedAt: approval.startedAt.toString(),
-        endedAt: approval.endedAt.toString(),
-        nonce: approval.nonce.toString(),
-        deadline: approval.deadline.toString()
-      }
+      runId: runId,
+      score: score,
+      startedAt: startedAt,
+      endedAt: endedAt
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('💥 Error submitting score:', error);
     
-    // Provide more specific error messages
+    // Provide more specific error messages for the simplified contract
     let errorMessage = 'Failed to submit score';
-    if (error.message.includes('missing revert data') || error.message.includes('execution reverted')) {
-      errorMessage = 'Contract execution failed - check if signer has proper roles and contract state is valid';
-    } else if (error.message.includes('insufficient funds')) {
+    if (error?.message?.includes('score>max')) {
+      errorMessage = 'Score exceeds maximum allowed value';
+    } else if (error?.message?.includes('bad time')) {
+      errorMessage = 'Invalid game time range';
+    } else if (error?.message?.includes('runId used')) {
+      errorMessage = 'This run ID has already been used';
+    } else if (error?.message?.includes('cooldown')) {
+      errorMessage = 'Player is still in cooldown period';
+    } else if (error?.message?.includes('paused')) {
+      errorMessage = 'Contract is currently paused';
+    } else if (error?.message?.includes('insufficient funds')) {
       errorMessage = 'Insufficient funds for transaction';
-    } else if (error.message.includes('nonce')) {
-      errorMessage = 'Transaction nonce issue';
-    } else if (error.message.includes('paused')) {
-      errorMessage = 'Contract is paused';
-    } else if (error.message.includes('deadline')) {
-      errorMessage = 'Signature deadline exceeded';
     }
     
     res.status(500).json({ 
       error: errorMessage,
-      details: error.message 
+      details: error?.message || error 
     });
   }
 });

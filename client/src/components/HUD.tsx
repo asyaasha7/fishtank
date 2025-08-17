@@ -132,25 +132,30 @@ export const HUD: React.FC<ExtendedHUDProps> = ({
             )}
             {wallet.isConnected && (
               <div className="stat-item">
-                <span className="stat-label">On-chain Score:</span>
+                <span className="stat-label">Best Score:</span>
                 <span className="stat-value">
-                  {fishtankLoading ? '⏳' : (fishtankData?.state.score || '0')}
+                  {fishtankLoading ? '⏳' : (fishtankData?.state.bestScore || '0')}
                 </span>
               </div>
             )}
             {wallet.isConnected && fishtankData && (
               <>
                 <div className="stat-item">
-                  <span className="stat-label">Chain Health:</span>
-                  <span className="stat-value">{fishtankData.state.health}</span>
+                  <span className="stat-label">Last Score:</span>
+                  <span className="stat-value">{fishtankData.state.lastScore}</span>
                 </div>
                 <div className="stat-item">
-                  <span className="stat-label">Chain Lives:</span>
-                  <span className="stat-value">{fishtankData.state.lives}</span>
+                  <span className="stat-label">Runs:</span>
+                  <span className="stat-value">{fishtankData.state.runs}</span>
                 </div>
                 <div className="stat-item">
-                  <span className="stat-label">Level:</span>
-                  <span className="stat-value">{fishtankData.state.level}</span>
+                  <span className="stat-label">Last Played:</span>
+                  <span className="stat-value">
+                    {fishtankData.state.lastPlayedAt === '0' 
+                      ? 'Never' 
+                      : new Date(parseInt(fishtankData.state.lastPlayedAt) * 1000).toLocaleString()
+                    }
+                  </span>
                 </div>
               </>
             )}

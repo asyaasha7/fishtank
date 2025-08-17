@@ -29,8 +29,21 @@ export function fishtankRO(): ethers.Contract {
     console.log('🔧 Using RPC:', KATANA_RPC);
     console.log('🔧 Chain ID:', KATANA_CHAIN_ID);
     
+    // Handle ABI format gracefully - extract from full JSON or use fallback
+    let contractABI: any;
+    try {
+      contractABI = (FishtankGameStateABI as any).abi || FishtankGameStateABI;
+    } catch {
+      // Fallback to minimal ABI for the simplified contract
+      contractABI = [
+        "function difficulty() view returns (uint8)",
+        "function getPlayer(address) view returns (tuple(uint64 bestScore, uint64 lastScore, uint32 runs, uint64 lastPlayedAt, bytes32 lastRunId))",
+        "function getTop5() view returns (address[5], uint64[5])"
+      ];
+    }
+    
     const provider = getProvider();
-    contract = new ethers.Contract(FISHTANK_ADDR, FishtankGameStateABI, provider);
+    contract = new ethers.Contract(FISHTANK_ADDR, contractABI, provider);
     console.log('✅ Fishtank contract instance created');
   }
   return contract;
@@ -50,12 +63,13 @@ export function getContractAddress(): string {
   return FISHTANK_ADDR;
 }
 
-// Types for contract interactions
+// Types for contract interactions (updated for new contract)
 export interface PlayerState {
-  score: string;
-  health: string;
-  lives: string;
-  level: string;
+  bestScore: string;
+  lastScore: string;
+  runs: string;
+  lastPlayedAt: string;
+  lastRunId: string;
 }
 
 export interface FishtankData {

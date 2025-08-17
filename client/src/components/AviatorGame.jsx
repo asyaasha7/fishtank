@@ -7,8 +7,8 @@ import GLTFCharacter from './GLTFCharacter'
 let gameState = {
   score: 0,
   lives: 3,
-  health: 3, // Current health progress (3 = full heart, 0 = damaged heart)
-  maxHealth: 3, // Max health per heart
+  health: 8, // Current health progress (8 = full heart, 0 = damaged heart)
+  maxHealth: 8, // Max health per heart (8 hits from Toxic Predator = 1 life lost)
   isGameOver: false,
   cubes: [],
   particleEffects: [],
@@ -35,7 +35,9 @@ function takeDamage(amount = 1) {
     if (gameState.lives <= 0) {
       console.log('💀 Game Over! Final Score:', gameState.score)
       gameState.isGameOver = true
-      // Don't auto-reset - let the UI handle restart
+      // Reset score immediately when game over occurs
+      gameState.score = 0
+      console.log('🔄 Score reset to 0 after game over')
     }
   }
 }
@@ -127,7 +129,7 @@ function ParticleEffect({ position, color, onComplete }) {
 }
 
 // Enhanced transaction cube with collision detection
-function GameTransactionCube({ character, position, speed, scale, sphereRef, onCollected, isShieldActive }) {
+function GameTransactionCube({ character, position, speed, scale, sphereRef, onCollected, isShieldActive, isPaused }) {
   const meshRef = useRef()
   const [isCollected, setIsCollected] = useState(false)
   const [lastPushTime, setLastPushTime] = useState(0)
@@ -147,7 +149,7 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
   }
 
   useFrame((state, delta) => {
-    if (meshRef.current && !isCollected) {
+    if (meshRef.current && !isCollected && !isPaused) {
       const time = state.clock.getElapsedTime();
       
       // Create a unique phase offset for each character based on their ID
@@ -375,7 +377,7 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
 
 
 // Game cubes manager component
-function GameCubes({ characters, sphereRef, onCubeCollected, isShieldActive }) {
+function GameCubes({ characters, sphereRef, onCubeCollected, isShieldActive, isPaused }) {
   const [cubeRegistry, setCubeRegistry] = useState(new Map())
   // Create or update cube data, preserving existing cubes and only adding new ones
   const cubeData = useMemo(() => {
@@ -442,6 +444,7 @@ function GameCubes({ characters, sphereRef, onCubeCollected, isShieldActive }) {
           sphereRef={sphereRef}
           onCollected={onCubeCollected}
           isShieldActive={isShieldActive}
+          isPaused={isPaused}
         />
       ))}
     </group>
@@ -449,7 +452,7 @@ function GameCubes({ characters, sphereRef, onCubeCollected, isShieldActive }) {
 }
 
 // Game scene with all components
-function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealthUpdate, onHealthUpdateNoFlash, isShieldActive }) {
+function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealthUpdate, onHealthUpdateNoFlash, isShieldActive, isPaused }) {
   const sphereRef = useRef()
   const [particles, setParticles] = useState([])
 
@@ -524,6 +527,9 @@ function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealth
         }
         if (gameState.lives <= 0) {
           gameState.isGameOver = true;
+          // Reset score immediately when game over occurs
+          gameState.score = 0;
+          console.log('🔄 Score reset to 0 after game over (Pufferfish)');
         }
         
         // Update UI without damage flash
@@ -583,12 +589,13 @@ function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealth
       <pointLight position={[8, 0, 0]} intensity={0.4} color="#00b894" />
       
       {/* Game objects */}
-      <GLTFCharacter mousePos={mousePos} sphereRef={sphereRef} isShieldActive={isShieldActive} />
+      <GLTFCharacter mousePos={!isPaused ? mousePos : null} sphereRef={sphereRef} isShieldActive={isShieldActive} />
       <GameCubes
         characters={characters} 
         sphereRef={sphereRef}
         onCubeCollected={handleCubeCollected}
         isShieldActive={isShieldActive}
+        isPaused={isPaused}
       />
       
       {/* Particle effects */}
@@ -608,17 +615,44 @@ function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealth
 }
 
 // Main game component with UI
-export default function FishtankGame({ characters, mousePos }) {
-  const [score, setScore] = useState(0)
-  const [lives, setLives] = useState(3)
-  const [health, setHealth] = useState(3) // Current health (0-3)
+export default function FishtankGame({ 
+  characters, 
+  mousePos, 
+  gameHealth,
+  setGameHealth,
+  gameScore,
+  setGameScore,
+  gameLives,
+  setGameLives,
+  isShieldActive,
+  setIsShieldActive,
+  shieldTimeLeft,
+  setShieldTimeLeft,
+  isPaused,
+  setIsPaused
+}) {
+  // Use props instead of local state for main game values
+  const [score, setScore] = useState(gameScore || 0)
+  const [lives, setLives] = useState(gameLives || 3)
+  const [health, setHealth] = useState(gameHealth || 8) // Current health (0-8, 8 hits from Toxic Predator = 1 life lost)
   const [recentPoints, setRecentPoints] = useState(null)
   const [damageFlash, setDamageFlash] = useState(false)
   const [isGameOver, setIsGameOver] = useState(false)
   const [isRiskTypesCollapsed, setIsRiskTypesCollapsed] = useState(false)
-  const [isShieldActive, setIsShieldActive] = useState(false)
-  const [shieldTimeLeft, setShieldTimeLeft] = useState(0)
   const [glitchEffect, setGlitchEffect] = useState(false)
+
+  // Sync local state with props when they change
+  React.useEffect(() => {
+    setScore(gameScore || 0)
+  }, [gameScore])
+  
+  React.useEffect(() => {
+    setLives(gameLives || 3)
+  }, [gameLives])
+  
+  React.useEffect(() => {
+    setHealth(gameHealth || 3)
+  }, [gameHealth])
 
   // Count creatures by type for display
   const creatureCounts = useMemo(() => {
@@ -649,7 +683,7 @@ export default function FishtankGame({ characters, mousePos }) {
   // Shield countdown effect
   useEffect(() => {
     let shieldTimer;
-    if (isShieldActive && shieldTimeLeft > 0) {
+    if (isShieldActive && shieldTimeLeft > 0 && !isPaused) {
       shieldTimer = setInterval(() => {
         setShieldTimeLeft(prev => {
           if (prev <= 1) {
@@ -665,10 +699,11 @@ export default function FishtankGame({ characters, mousePos }) {
     return () => {
       if (shieldTimer) clearInterval(shieldTimer);
     };
-  }, [isShieldActive, shieldTimeLeft]);
+  }, [isShieldActive, shieldTimeLeft, isPaused]);
 
   const handleScoreUpdate = (newScore, points) => {
     setScore(newScore)
+    setGameScore(newScore) // Update parent state
     setRecentPoints(points)
     
     // Clear recent points after animation
@@ -677,14 +712,22 @@ export default function FishtankGame({ characters, mousePos }) {
 
   const handleLifeUpdate = (newLives) => {
     setLives(newLives)
+    setGameLives(newLives) // Update parent state
   }
 
   const handleHealthUpdate = (newHealth) => {
     setHealth(newHealth)
+    setGameHealth(newHealth) // Update parent state
     
     // Check for game over
     if (gameState.isGameOver) {
       setIsGameOver(true)
+      // Reset score to 0 when game over is detected
+      if (gameState.score === 0) {
+        setScore(0)
+        setGameScore(0)
+        console.log('🔄 UI score reset to 0 after game over')
+      }
     }
     
     // Trigger damage flash effect
@@ -694,26 +737,22 @@ export default function FishtankGame({ characters, mousePos }) {
 
   const handleHealthUpdateNoFlash = (newHealth) => {
     setHealth(newHealth)
+    setGameHealth(newHealth) // Update parent state
     
     // Check for game over without damage flash
     if (gameState.isGameOver) {
       setIsGameOver(true)
+      // Reset score to 0 when game over is detected
+      if (gameState.score === 0) {
+        setScore(0)
+        setGameScore(0)
+        console.log('🔄 UI score reset to 0 after game over (no flash)')
+      }
     }
   }
 
-  const handleBuyShield = () => {
-    if (score >= 100 && !isShieldActive) {
-      // Deduct points and activate shield
-      setScore(prevScore => prevScore - 100);
-      setIsShieldActive(true);
-      setShieldTimeLeft(10); // 10 seconds of protection
-      console.log('🛡️ Shield activated! 10 seconds of protection against Toxic Predators');
-      
-      // Show points deduction animation
-      setRecentPoints(-100);
-      setTimeout(() => setRecentPoints(null), 1500);
-    }
-  }
+  // Shield purchase is now handled at the Home component level
+  // This function can be removed or used for internal game logic if needed
 
   const handleRestart = () => {
     // Reset global game state
@@ -722,10 +761,15 @@ export default function FishtankGame({ characters, mousePos }) {
     // Reset local component state
     setScore(0)
     setLives(3)
-    setHealth(3)
+    setHealth(8) // Reset to 8 health (8 hits from Toxic Predator = 1 life lost)
     setIsGameOver(false)
     setRecentPoints(null)
     setDamageFlash(false)
+    
+    // Reset parent state
+    setGameScore(0)
+    setGameHealth(8)
+    setGameLives(3)
   }
 
   // Monitor game state for game over condition
@@ -775,7 +819,7 @@ export default function FishtankGame({ characters, mousePos }) {
           <div style={{
             fontSize: '4rem',
             marginBottom: '1rem',
-            background: 'linear-gradient(45deg, #ff6b6b, #ee5a24, #ff6b6b)',
+            background: 'linear-gradient(45deg,rgb(255, 107, 127),rgb(231, 36, 238),rgb(194, 25, 25))',
             backgroundClip: 'text',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
@@ -880,6 +924,7 @@ export default function FishtankGame({ characters, mousePos }) {
           onHealthUpdate={handleHealthUpdate}
           onHealthUpdateNoFlash={handleHealthUpdateNoFlash}
           isShieldActive={isShieldActive}
+          isPaused={isPaused}
         />
       </Canvas>
       

@@ -66,12 +66,13 @@ function Home() {
   const [selectedChain, setSelectedChain] = useState('ethereum')
   
   // Payment system states
-  const [gameHealth, setGameHealth] = useState(9) // Start with full health
+  const [gameHealth, setGameHealth] = useState(8) // Start with full health (8 hits from Toxic Predator = 1 life lost)
   const [gameScore, setGameScore] = useState(0)
   const [paymentModal, setPaymentModal] = useState({ isOpen: false, paymentInfo: null })
   const [gameLives, setGameLives] = useState(3)
   const [isShieldActive, setIsShieldActive] = useState(false)
   const [shieldTimeLeft, setShieldTimeLeft] = useState(0)
+  const [isPaused, setIsPaused] = useState(false)
   const wallet = useWallet()
 
   useEffect(() => {
@@ -86,11 +87,38 @@ function Home() {
 
     document.addEventListener('mousemove', handleMouseMove, false);
     
-    // Set up automatic refresh every 10 seconds
+    // Add keyboard listeners for hotkeys
+    const handleKeyPress = (event) => {
+      // Prevent hotkeys when typing in input fields
+      if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+        return
+      }
+
+      switch(event.key.toLowerCase()) {
+        case ' ': // Spacebar for shield
+          event.preventDefault()
+          handleBuyShield()
+          break
+        case 'p': // P key for pause
+        case 'z': // Z key for pause (alternative)
+          event.preventDefault()
+          setIsPaused(prev => !prev)
+          console.log(`🎮 Game ${!isPaused ? 'paused' : 'resumed'}`)
+          break
+        default:
+          break
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyPress)
+    
+    // Set up automatic refresh every 10 seconds (pauses when game is paused)
     const refreshInterval = setInterval(() => {
-      console.log('🔄 Auto-refreshing transactions...')
-      setIsAutoRefreshing(true)
-      loadTransactions(false) // Smooth refresh
+      if (!isPaused) {
+        console.log('🔄 Auto-refreshing transactions...')
+        setIsAutoRefreshing(true)
+        loadTransactions(false) // Smooth refresh
+      }
     }, 10000) // 10 seconds
     
     // Countdown timer that updates every second
@@ -105,10 +133,11 @@ function Home() {
     
     return () => {
       document.removeEventListener('mousemove', handleMouseMove, false);
+      document.removeEventListener('keydown', handleKeyPress);
       clearInterval(refreshInterval);
       clearInterval(countdownInterval);
     };
-  }, [selectedChain]) // Reload when chain changes
+  }, [selectedChain, isPaused]) // Reload when chain changes or pause state changes
 
   const handleChainSwitch = (newChain) => {
     if (newChain !== selectedChain) {
@@ -224,6 +253,21 @@ function Home() {
     } catch (error) {
       console.error('Payment completion error:', error);
       alert(`Payment processing failed: ${error.message}`);
+    }
+  };
+
+  const handleBuyShield = () => {
+    // Check if we have enough score to buy shield
+    console.log('🛡️ Shield purchase attempt - Score:', gameScore, 'Shield Active:', isShieldActive);
+    if (gameScore >= 100 && !isShieldActive) {
+      // Deduct points
+      setGameScore(prevScore => prevScore - 100);
+      // Activate shield
+      setIsShieldActive(true);
+      setShieldTimeLeft(10);
+      console.log('🛡️ Shield activated! Visual effect should now appear around character');
+    } else {
+      console.log('🛡️ Cannot buy shield - insufficient score or shield already active');
     }
   };
 
@@ -443,6 +487,8 @@ function Home() {
             setIsShieldActive={setIsShieldActive}
             shieldTimeLeft={shieldTimeLeft}
             setShieldTimeLeft={setShieldTimeLeft}
+            isPaused={isPaused}
+            setIsPaused={setIsPaused}
           />
         </div>
       )}
@@ -450,20 +496,17 @@ function Home() {
       {/* HUD Overlay */}
       <HUD
         health={gameHealth}
-        maxHealth={9}
+        maxHealth={8}
         score={gameScore}
         onRefillHealth={handleRefillHealth}
         onAddFunds={handleAddFunds}
         lives={gameLives}
         isShieldActive={isShieldActive}
         shieldTimeLeft={shieldTimeLeft}
-        onBuyShield={() => {
-          // This will be handled by the game component
-          // For now, just a placeholder
-          console.log('Shield purchase requested from HUD');
-        }}
+        onBuyShield={handleBuyShield}
         selectedChain={selectedChain}
         creatureCount={characters ? characters.length : 0}
+        isPaused={isPaused}
       />
 
       {/* Payment Modal */}

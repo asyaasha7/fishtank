@@ -282,7 +282,7 @@ function Profile() {
                   </div>
                   {wallet.isConnected && fishtankData && (
                     <div style={{ fontSize: '0.8rem', opacity: 0.8, marginTop: '0.5rem', color: '#00b894' }}>
-                      🎮 On-chain Score: {fishtankData.state.score} • Health: {fishtankData.state.health} • Lives: {fishtankData.state.lives}
+                      🎮 Best: {fishtankData.state.bestScore} • Last: {fishtankData.state.lastScore} • Runs: {fishtankData.state.runs}
                     </div>
                   )}
                   {!wallet.isConnected && (
@@ -315,20 +315,20 @@ function Profile() {
                 <StatCard icon="🎮" label="Games Played" value={userData.gamesPlayed} />
                 <StatCard 
                   icon="🏆" 
-                  label={wallet.isConnected && fishtankData ? "On-chain Score" : "Best Score"} 
-                  value={wallet.isConnected && fishtankData ? fishtankData.state.score : userData.bestScore.toLocaleString()} 
+                  label={wallet.isConnected && fishtankData ? "Best Score" : "Best Score"} 
+                  value={wallet.isConnected && fishtankData ? fishtankData.state.bestScore : userData.bestScore.toLocaleString()} 
                   color="#fdcb6e" 
                 />
                 <StatCard 
                   icon="📊" 
-                  label={wallet.isConnected && fishtankData ? "Chain Health" : "Total Score"} 
-                  value={wallet.isConnected && fishtankData ? fishtankData.state.health : userData.totalScore.toLocaleString()} 
+                  label={wallet.isConnected && fishtankData ? "Last Score" : "Total Score"} 
+                  value={wallet.isConnected && fishtankData ? fishtankData.state.lastScore : userData.totalScore.toLocaleString()} 
                   color="#00b894" 
                 />
                 <StatCard 
-                  icon={wallet.isConnected && fishtankData ? "👤" : "⏱️"} 
-                  label={wallet.isConnected && fishtankData ? "Chain Lives" : "Time Swimming"} 
-                  value={wallet.isConnected && fishtankData ? fishtankData.state.lives : userData.totalTimeAlive} 
+                  icon={wallet.isConnected && fishtankData ? "🎮" : "⏱️"} 
+                  label={wallet.isConnected && fishtankData ? "Total Runs" : "Time Swimming"} 
+                  value={wallet.isConnected && fishtankData ? fishtankData.state.runs : userData.totalTimeAlive} 
                   color="#a29bfe" 
                 />
               </div>

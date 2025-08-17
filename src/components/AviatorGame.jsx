@@ -152,8 +152,7 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
       let movementSpeed = 15; // Default speed
       
       if (character.name === "Toxic Predator") {
-        console.log("HERE WE ARE")
-        movementSpeed = 15; // Keep same speed as default for dangerous cubes
+        movementSpeed = 10; // Keep same speed as default for dangerous cubes
         
         // Add vertical oscillation to make Toxic Predators more menacing
         const time = state.clock.getElapsedTime();

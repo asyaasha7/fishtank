@@ -338,10 +338,20 @@ function Home() {
     if (!wallet.address) return;
     
     try {
-      console.log(`📡 Submitting final score: ${finalScore}, health: ${finalHealth}, lives: ${finalLives}`);
-      await submitScore(wallet.address, finalScore, finalHealth, finalLives);
+      console.log(`📡 Submitting final score: ${finalScore} (health: ${finalHealth}, lives: ${finalLives})`);
+      const result = await submitScore(wallet.address, finalScore);
+      console.log('✅ Score submission result:', result);
+      
+      // Give some time for the blockchain to update, then refresh data
+      setTimeout(() => {
+        console.log('🔄 Refreshing player data after score submission...');
+        // The HUD component will automatically refresh its data due to polling
+        // We could also trigger a manual refresh if needed
+      }, 2000);
+      
     } catch (error) {
       console.error('Failed to submit score:', error);
+      alert(`Failed to submit score: ${error.message}`);
     }
   };
 

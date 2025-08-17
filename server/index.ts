@@ -1,8 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { ethers } from 'ethers';
+import { ethers, keccak256, toUtf8Bytes } from 'ethers';
 import FishtankGameStateABI from './abi/FishtankGameState.json';
+import { createCDPClient } from './cdp';
 
 // Load environment variables
 dotenv.config({ path: '../.env' });
@@ -13,6 +14,12 @@ const PORT = process.env.PORT || 4000;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Initialize CDP client
+const cdpClient = createCDPClient(
+  process.env.CDP_API_KEY_ID,
+  process.env.CDP_API_SECRET
+);
 
 // Blockchain setup
 const provider = new ethers.JsonRpcProvider(process.env.KATANA_RPC);
@@ -31,6 +38,28 @@ const signerPrivateKey = process.env.SIGNER_PK && process.env.SIGNER_PK.length =
 const reporterWallet = new ethers.Wallet(reporterPrivateKey, provider);
 const signerWallet = new ethers.Wallet(signerPrivateKey, provider);
 
+// Note: The ABI file should contain just the ABI array, not the full Remix output
+// For now, we'll handle the ABI format gracefully
+let contractABI: any;
+try {
+  // Try to extract ABI from the imported JSON
+  contractABI = FishtankGameStateABI.abi || FishtankGameStateABI;
+} catch {
+  // Fallback to a minimal ABI for the simplified contract
+  contractABI = [
+    "function difficulty() view returns (uint8)",
+    "function getPlayer(address) view returns (tuple(uint64 bestScore, uint64 lastScore, uint32 runs, uint64 lastPlayedAt, bytes32 lastRunId))",
+    "function getTop5() view returns (address[5], uint64[5])",
+    "function submitScore(uint64 score, bytes32 runId, uint64 startedAt, uint64 endedAt)"
+  ];
+}
+
+const fishtankContract = new ethers.Contract(
+  process.env.FISHTANK_ADDR!,
+  contractABI,
+  reporterWallet
+);
+
 console.log('🔧 Server setup:');
 console.log('📡 RPC:', process.env.KATANA_RPC);
 console.log('🏠 Contract:', process.env.FISHTANK_ADDR);
@@ -48,33 +77,12 @@ console.log('✍️ Signer:', signerWallet.address);
     // Test contract connectivity
     const difficulty = await fishtankContract.difficulty();
     console.log('🎯 Contract difficulty:', difficulty.toString());
-  } catch (error) {
-    console.warn('⚠️  Initial setup check failed:', error.message);
+  } catch (error: any) {
+    console.warn('⚠️  Initial setup check failed:', error?.message || error);
   }
 })();
 
-const fishtankContract = new ethers.Contract(
-  process.env.FISHTANK_ADDR!,
-  FishtankGameStateABI,
-  reporterWallet
-);
-
-// EIP-712 Domain for signature verification
-const domain = {
-  name: "FishtankGameState",
-  version: "1",
-  chainId: parseInt(process.env.KATANA_CHAIN_ID!),
-  verifyingContract: process.env.FISHTANK_ADDR!
-};
-
-const types = {
-  ScoreSubmission: [
-    { name: "player", type: "address" },
-    { name: "score", type: "uint256" },
-    { name: "health", type: "uint256" },
-    { name: "lives", type: "uint256" }
-  ]
-};
+// No more EIP-712 signatures needed for the simplified contract
 
 // Routes
 
@@ -82,6 +90,8 @@ const types = {
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+
 
 // Get player state (read-only)
 app.get('/api/fishtank/player/:addr', async (req, res) => {
@@ -92,33 +102,35 @@ app.get('/api/fishtank/player/:addr', async (req, res) => {
       return res.status(400).json({ error: 'Invalid address' });
     }
 
-    const playerState = await fishtankContract.playerStates(addr);
+    const playerData = await fishtankContract.getPlayer(addr);
     const difficulty = await fishtankContract.difficulty();
 
     res.json({
       player: addr,
       state: {
-        score: playerState.score.toString(),
-        health: playerState.health.toString(),
-        lives: playerState.lives.toString(),
-        level: playerState.level.toString()
+        bestScore: playerData.bestScore.toString(),
+        lastScore: playerData.lastScore.toString(),
+        runs: playerData.runs.toString(),
+        lastPlayedAt: playerData.lastPlayedAt.toString(),
+        lastRunId: playerData.lastRunId
       },
       difficulty: difficulty.toString()
     });
-  } catch (error) {
-    console.error('Error fetching player state:', error.message);
+  } catch (error: any) {
+    console.error('Error fetching player state:', error?.message || error);
     
     // Handle specific contract errors gracefully
-    if (error.message.includes('missing revert data') || error.message.includes('execution reverted')) {
+    if (error?.message?.includes('missing revert data') || error?.message?.includes('execution reverted')) {
       // Player likely doesn't exist in contract yet, return default state
       const { addr } = req.params;
       res.json({
         player: addr,
         state: {
-          score: '0',
-          health: '0',
-          lives: '0',
-          level: '0'
+          bestScore: "0",
+          lastScore: "0",
+          runs: "0",
+          lastPlayedAt: "0",
+          lastRunId: "0x0000000000000000000000000000000000000000000000000000000000000000"
         },
         difficulty: '2' // Default difficulty
       });
@@ -142,47 +154,30 @@ app.get('/api/fishtank/difficulty', async (req, res) => {
 // Get leaderboard data
 app.get('/api/fishtank/leaderboard', async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit as string) || 10;
+    const limit = parseInt(req.query.limit as string) || 5; // Max 5 for Top5 contract
     
-    // Get all ScoreSubmitted events from the contract
-    const filter = fishtankContract.filters.ScoreSubmitted();
-    const events = await fishtankContract.queryFilter(filter, -10000); // Last 10k blocks
+    // Get Top5 leaderboard directly from contract
+    const [addresses, scores] = await fishtankContract.getTop5();
     
-    // Process events to create leaderboard
-    const playerScores = new Map();
-    
-    events.forEach(event => {
-      const { player, score, health, lives } = event.args;
-      const playerAddr = player.toLowerCase();
-      const scoreValue = parseInt(score.toString());
-      
-      // Keep the highest score for each player
-      if (!playerScores.has(playerAddr) || playerScores.get(playerAddr).score < scoreValue) {
-        playerScores.set(playerAddr, {
-          player: player,
-          score: scoreValue,
-          health: parseInt(health.toString()),
-          lives: parseInt(lives.toString()),
-          blockNumber: event.blockNumber,
-          transactionHash: event.transactionHash
+    // Build leaderboard array, filtering out empty slots
+    const leaderboard = [];
+    for (let i = 0; i < Math.min(addresses.length, limit); i++) {
+      if (addresses[i] !== ethers.ZeroAddress && scores[i] > 0) {
+        leaderboard.push({
+          rank: i + 1,
+          player: addresses[i],
+          address: addresses[i],
+          displayAddress: `${addresses[i].slice(0, 6)}...${addresses[i].slice(-4)}`,
+          score: parseInt(scores[i].toString())
         });
       }
-    });
+    }
     
-    // Convert to array and sort by score (descending)
-    const leaderboard = Array.from(playerScores.values())
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit)
-      .map((entry, index) => ({
-        rank: index + 1,
-        ...entry,
-        address: entry.player,
-        displayAddress: `${entry.player.slice(0, 6)}...${entry.player.slice(-4)}`
-      }));
+    console.log(`📊 Top5 Leaderboard requested (limit: ${limit}), found ${leaderboard.length} entries`);
     
     res.json({
       leaderboard,
-      totalPlayers: playerScores.size,
+      totalPlayers: leaderboard.length,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
@@ -253,82 +248,119 @@ app.post('/api/fishtank/event/health', async (req, res) => {
   }
 });
 
-// Submit score with EIP-712 signature
+// DEPRECATED: Score submission now happens directly from user wallet
+// This endpoint is kept for backwards compatibility but should not be used
 app.post('/api/fishtank/score/submit', async (req, res) => {
+  res.status(400).json({ 
+    error: 'Score submission has moved to client-side. Please update your game client.',
+    message: 'Scores should now be submitted directly from the user wallet to the smart contract.'
+  });
+  return;
+
+  // [Removed deprecated server-side submission code - now handled client-side]
+});
+
+// Coinbase CDP integration endpoints
+
+// GET /api/balances?address=0x... → CDP Token Balances (Base)
+app.get('/api/balances', async (req, res) => {
   try {
-    const { player, score, health, lives } = req.body;
-
-    if (!ethers.isAddress(player)) {
-      return res.status(400).json({ error: 'Invalid player address' });
-    }
-
-    if (typeof score !== 'number' || score < 0) {
-      return res.status(400).json({ error: 'Invalid score' });
-    }
-
-    if (typeof health !== 'number' || health < 0) {
-      return res.status(400).json({ error: 'Invalid health' });
-    }
-
-    if (typeof lives !== 'number' || lives < 0) {
-      return res.status(400).json({ error: 'Invalid lives' });
-    }
-
-    // Create EIP-712 signature
-    const message = {
-      player,
-      score: BigInt(score),
-      health: BigInt(health),
-      lives: BigInt(lives)
-    };
-
-    const signature = await signerWallet.signTypedData(domain, types, message);
-
-    console.log(`Submitting score: ${player}, score: ${score}, health: ${health}, lives: ${lives}`);
+    const { address } = req.query;
     
-    // Check if signer has required role (for debugging)
-    try {
-      const signerRole = await fishtankContract.SIGNER_ROLE();
-      const hasSignerRole = await fishtankContract.hasRole(signerRole, signerWallet.address);
-      console.log(`🔐 Signer role check: ${signerWallet.address} has SIGNER_ROLE: ${hasSignerRole}`);
-      
-      if (!hasSignerRole) {
-        console.warn(`⚠️  Warning: Signer wallet ${signerWallet.address} does not have SIGNER_ROLE`);
-      }
-    } catch (roleError) {
-      console.log(`🔍 Role check failed (contract might not support roles):`, roleError.message);
+    if (!address || typeof address !== 'string') {
+      return res.status(400).json({ error: 'Address parameter is required' });
     }
 
-    // Submit to contract with manual gas settings
-    const gasLimit = 200000; // Set a reasonable gas limit
-    const tx = await fishtankContract.submitScore(player, score, health, lives, signature, {
-      gasLimit: gasLimit
-    });
-    const receipt = await tx.wait();
+    // Validate Ethereum address format
+    if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+      return res.status(400).json({ error: 'Invalid Ethereum address format' });
+    }
+
+    console.log(`Fetching balances for address: ${address}`);
+    const balances = await cdpClient.getTokenBalances(address, 'base');
+    
+    res.json(balances);
+  } catch (error) {
+    console.error('Balance fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch balances' });
+  }
+});
+
+// GET /api/onramp-url?address=0x... → returns hosted Onramp URL
+app.get('/api/onramp-url', (req, res) => {
+  try {
+    const { address } = req.query;
+    
+    if (!address || typeof address !== 'string') {
+      return res.status(400).json({ error: 'Address parameter is required' });
+    }
+
+    // Updated Coinbase Onramp URL with new API parameters
+    const onrampUrl = new URL('https://pay.coinbase.com/buy/select-asset');
+    
+    // Use new API parameters (addresses and assets instead of destinationWallets)
+    onrampUrl.searchParams.set('addresses', JSON.stringify({
+      [address]: ['base']
+    }));
+    onrampUrl.searchParams.set('assets', JSON.stringify(['USDC']));
+    onrampUrl.searchParams.set('defaultAsset', 'USDC');
+    onrampUrl.searchParams.set('defaultNetwork', 'base');
+    onrampUrl.searchParams.set('defaultPaymentMethod', 'CARD');
+    
+    // Add appId (Project ID) from environment variables
+    onrampUrl.searchParams.set('appId', process.env.COINBASE_PROJECT_ID || 'fishtank-liquidity-hunter');
 
     res.json({
-      success: true,
-      txHash: receipt.hash,
-      blockNumber: receipt.blockNumber,
-      signature
+      url: onrampUrl.toString(),
+      message: 'Open this URL to buy USDC on Base'
     });
   } catch (error) {
-    console.error('Error submitting score:', error);
-    
-    // Provide more specific error messages
-    let errorMessage = 'Failed to submit score';
-    if (error.message.includes('missing revert data') || error.message.includes('execution reverted')) {
-      errorMessage = 'Contract execution failed - check if signer has proper roles and contract state is valid';
-    } else if (error.message.includes('insufficient funds')) {
-      errorMessage = 'Insufficient funds for transaction';
-    } else if (error.message.includes('nonce')) {
-      errorMessage = 'Transaction nonce issue';
+    console.error('Onramp URL error:', error);
+    res.status(500).json({ error: 'Failed to generate onramp URL' });
+  }
+});
+
+// Health refill with x402 pattern
+app.post('/api/refill', async (req, res) => {
+  try {
+    const currentHealth = parseInt(req.headers['x-current-health'] as string);
+    const playerAddress = req.headers['x-player-address'] as string;
+    const paymentProof = req.headers['x-payment'] as string;
+
+    if (!playerAddress || !ethers.isAddress(playerAddress)) {
+      return res.status(400).json({ error: 'Valid X-Player-Address header is required' });
     }
+
+    if (isNaN(currentHealth) || currentHealth < 0) {
+      return res.status(400).json({ error: 'Valid X-Current-Health header is required' });
+    }
+
+    // If no payment proof, return 402 Payment Required
+    if (!paymentProof) {
+      return res.status(402).json({
+        payment: {
+          price: '0.01',
+          currency: 'USDC',
+          network: 'base',
+          receiver: process.env.REFILL_RECEIVER || '0x742a4a9F23E8C14e8C20320E6e0B3E9e2DF5A5F8',
+          message: 'Pay 0.01 USDC on Base to refill health (+3 HP)'
+        }
+      });
+    }
+
+    // Verify payment (simplified for demo)
+    console.log(`💊 Health refill requested by ${playerAddress} (current: ${currentHealth}HP, proof: ${paymentProof})`);
     
-    res.status(500).json({ 
-      error: errorMessage,
-      details: error.message 
+    const newHealth = Math.min(currentHealth + 3, 9); // Cap at 9 HP
+    
+    res.json({
+      ok: true,
+      newHealth,
+      message: `Health refilled to ${newHealth} HP`
     });
+  } catch (error: any) {
+    console.error('Error processing refill:', error?.message || error);
+    res.status(500).json({ error: 'Failed to process health refill' });
   }
 });
 

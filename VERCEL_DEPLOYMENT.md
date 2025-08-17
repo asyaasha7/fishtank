@@ -44,6 +44,19 @@ vercel --prod
 vercel
 ```
 
+## Common Issues & Fixes
+
+### Function Runtime Error
+If you see `Error: Function Runtimes must have a valid version`, the serverless functions are using CommonJS exports (`module.exports`) instead of ES modules (`export default`).
+
+### Missing API Endpoints
+All serverless functions are located in the `/api` directory and use CommonJS format:
+```javascript
+module.exports = function handler(req, res) {
+  // function implementation
+}
+```
+
 ## File Structure
 
 ```

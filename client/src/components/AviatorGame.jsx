@@ -7,8 +7,8 @@ import GLTFCharacter from './GLTFCharacter'
 let gameState = {
   score: 0,
   lives: 3,
-  health: 3, // Current health progress (3 = full heart, 0 = damaged heart)
-  maxHealth: 3, // Max health per heart
+  health: 8, // Current health progress (8 = full heart, 0 = damaged heart)
+  maxHealth: 8, // Max health per heart (8 hits from Toxic Predator = 1 life lost)
   isGameOver: false,
   cubes: [],
   particleEffects: [],
@@ -35,7 +35,9 @@ function takeDamage(amount = 1) {
     if (gameState.lives <= 0) {
       console.log('💀 Game Over! Final Score:', gameState.score)
       gameState.isGameOver = true
-      // Don't auto-reset - let the UI handle restart
+      // Reset score immediately when game over occurs
+      gameState.score = 0
+      console.log('🔄 Score reset to 0 after game over')
     }
   }
 }
@@ -127,7 +129,7 @@ function ParticleEffect({ position, color, onComplete }) {
 }
 
 // Enhanced transaction cube with collision detection
-function GameTransactionCube({ character, position, speed, scale, sphereRef, onCollected, isShieldActive }) {
+function GameTransactionCube({ character, position, speed, scale, sphereRef, onCollected, isShieldActive, isPaused }) {
   const meshRef = useRef()
   const [isCollected, setIsCollected] = useState(false)
   const [lastPushTime, setLastPushTime] = useState(0)
@@ -147,38 +149,72 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
   }
 
   useFrame((state, delta) => {
-    if (meshRef.current && !isCollected) {
-      // Different movement speeds based on character type
+    if (meshRef.current && !isCollected && !isPaused) {
+      const time = state.clock.getElapsedTime();
+      
+      // Create a unique phase offset for each character based on their ID
+      let hash = 0;
+      for (let i = 0; i < character.id.length; i++) {
+        hash = ((hash << 5) - hash + character.id.charCodeAt(i)) & 0xffffffff;
+      }
+      const uniqueOffset = Math.abs(hash % 1000) * 0.001;
+      
+      // Different movement patterns based on character type
       let movementSpeed = 15; // Default speed
+      let oscillationAmplitude = 1.2; // Default oscillation
+      let oscillationSpeed = 1.5; // Default wave speed
       
       if (character.name === "Toxic Predator") {
-        console.log("HERE WE ARE")
-        movementSpeed = 15; // Keep same speed as default for dangerous cubes
+        movementSpeed = 15; // Keep aggressive speed
+        oscillationAmplitude = 2.0; // More dramatic curves
+        oscillationSpeed = 2.5; // Faster, more menacing movement
         
-        // Add vertical oscillation to make Toxic Predators more menacing
-        const time = state.clock.getElapsedTime();
-        const oscillationAmplitude = 1.5; // How far up/down they move
-        const oscillationSpeed = 2.0; // How fast they oscillate
-        // Create a numeric hash from the character ID for unique offset
-        let hash = 0;
-        for (let i = 0; i < character.id.length; i++) {
-          hash = ((hash << 5) - hash + character.id.charCodeAt(i)) & 0xffffffff;
-        }
-        const uniqueOffset = Math.abs(hash % 1000) * 0.001; // Unique phase offset for each predator
-        
-        currentPosition.current[1] += Math.sin(time * oscillationSpeed + uniqueOffset) * oscillationAmplitude * delta;
-        
-        // Keep them within reasonable bounds
-        currentPosition.current[1] = Math.max(-4, Math.min(4, currentPosition.current[1]));
+        // Add sine wave movement with some aggression
+        const primaryWave = Math.sin(time * oscillationSpeed + uniqueOffset) * oscillationAmplitude;
+        const secondaryWave = Math.sin(time * oscillationSpeed * 1.7 + uniqueOffset + Math.PI/3) * (oscillationAmplitude * 0.3);
+        currentPosition.current[1] += (primaryWave + secondaryWave) * delta;
         
         // Make Toxic Predator swim close to the player's Z-axis for better collision
         if (sphereRef.current) {
-          currentPosition.current[2] = sphereRef.current.position.z; // Match player's Z position (2)
+          currentPosition.current[2] = sphereRef.current.position.z;
         }
+      } else if (character.name === "Treasure Jellyfish") {
+        movementSpeed = 10; // Moderate speed for collectibles
+        oscillationAmplitude = 1.8; // Graceful movement
+        oscillationSpeed = 1.2; // Slower, more elegant
+        
+        // Smooth, flowing movement like a jellyfish
+        const primaryWave = Math.sin(time * oscillationSpeed + uniqueOffset) * oscillationAmplitude;
+        const flowWave = Math.cos(time * oscillationSpeed * 0.8 + uniqueOffset) * (oscillationAmplitude * 0.5);
+        currentPosition.current[1] += (primaryWave + flowWave) * delta;
+      } else if (character.name === "Pufferfish Trap") {
+        movementSpeed = 6; // Slower, more predictable
+        oscillationAmplitude = 0.8; // Smaller movements
+        oscillationSpeed = 1.0; // Steady pace
+        
+        // Gentle bobbing motion
+        currentPosition.current[1] += Math.sin(time * oscillationSpeed + uniqueOffset) * oscillationAmplitude * delta;
+      } else if (character.name === "Turbulent Current") {
+        movementSpeed = 12; // Medium speed
+        oscillationAmplitude = 2.5; // Large, turbulent movements
+        oscillationSpeed = 3.0; // Fast, chaotic
+        
+        // Chaotic, turbulent movement
+        const turbulence1 = Math.sin(time * oscillationSpeed + uniqueOffset) * oscillationAmplitude;
+        const turbulence2 = Math.sin(time * oscillationSpeed * 1.3 + uniqueOffset + Math.PI/2) * (oscillationAmplitude * 0.6);
+        const turbulence3 = Math.sin(time * oscillationSpeed * 2.1 + uniqueOffset + Math.PI) * (oscillationAmplitude * 0.2);
+        currentPosition.current[1] += (turbulence1 + turbulence2 + turbulence3) * delta;
       } else {
-        // Make other cubes swim slower
-        movementSpeed = 8; // Slower speed for non-dangerous cubes
+        // Standard transaction - simple, gentle movement
+        movementSpeed = 8; // Slower speed for standard
+        oscillationAmplitude = 1.0; // Gentle curves
+        oscillationSpeed = 1.0; // Calm movement
+        
+        currentPosition.current[1] += Math.sin(time * oscillationSpeed + uniqueOffset) * oscillationAmplitude * delta;
       }
+      
+      // Keep all characters within reasonable bounds
+      currentPosition.current[1] = Math.max(-4, Math.min(4, currentPosition.current[1]));
       
       // Move from right to left - use independent position tracking
       currentPosition.current[0] -= speed * delta * movementSpeed
@@ -339,8 +375,9 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
 
 
 
+
 // Game cubes manager component
-function GameCubes({ characters, sphereRef, onCubeCollected, isShieldActive }) {
+function GameCubes({ characters, sphereRef, onCubeCollected, isShieldActive, isPaused }) {
   const [cubeRegistry, setCubeRegistry] = useState(new Map())
   // Create or update cube data, preserving existing cubes and only adding new ones
   const cubeData = useMemo(() => {
@@ -407,6 +444,7 @@ function GameCubes({ characters, sphereRef, onCubeCollected, isShieldActive }) {
           sphereRef={sphereRef}
           onCollected={onCubeCollected}
           isShieldActive={isShieldActive}
+          isPaused={isPaused}
         />
       ))}
     </group>
@@ -414,7 +452,7 @@ function GameCubes({ characters, sphereRef, onCubeCollected, isShieldActive }) {
 }
 
 // Game scene with all components
-function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealthUpdate, onHealthUpdateNoFlash, isShieldActive }) {
+function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealthUpdate, onHealthUpdateNoFlash, isShieldActive, isPaused }) {
   const sphereRef = useRef()
   const [particles, setParticles] = useState([])
 
@@ -489,6 +527,9 @@ function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealth
         }
         if (gameState.lives <= 0) {
           gameState.isGameOver = true;
+          // Reset score immediately when game over occurs
+          gameState.score = 0;
+          console.log('🔄 Score reset to 0 after game over (Pufferfish)');
         }
         
         // Update UI without damage flash
@@ -548,12 +589,13 @@ function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealth
       <pointLight position={[8, 0, 0]} intensity={0.4} color="#00b894" />
       
       {/* Game objects */}
-      <GLTFCharacter mousePos={mousePos} sphereRef={sphereRef} isShieldActive={isShieldActive} />
+      <GLTFCharacter mousePos={!isPaused ? mousePos : null} sphereRef={sphereRef} isShieldActive={isShieldActive} />
       <GameCubes
         characters={characters} 
         sphereRef={sphereRef}
         onCubeCollected={handleCubeCollected}
         isShieldActive={isShieldActive}
+        isPaused={isPaused}
       />
       
       {/* Particle effects */}
@@ -573,17 +615,44 @@ function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealth
 }
 
 // Main game component with UI
-export default function FishtankGame({ characters, mousePos }) {
-  const [score, setScore] = useState(0)
-  const [lives, setLives] = useState(3)
-  const [health, setHealth] = useState(3) // Current health (0-3)
+export default function FishtankGame({ 
+  characters, 
+  mousePos, 
+  gameHealth,
+  setGameHealth,
+  gameScore,
+  setGameScore,
+  gameLives,
+  setGameLives,
+  isShieldActive,
+  setIsShieldActive,
+  shieldTimeLeft,
+  setShieldTimeLeft,
+  isPaused,
+  setIsPaused
+}) {
+  // Use props instead of local state for main game values
+  const [score, setScore] = useState(gameScore || 0)
+  const [lives, setLives] = useState(gameLives || 3)
+  const [health, setHealth] = useState(gameHealth || 8) // Current health (0-8, 8 hits from Toxic Predator = 1 life lost)
   const [recentPoints, setRecentPoints] = useState(null)
   const [damageFlash, setDamageFlash] = useState(false)
   const [isGameOver, setIsGameOver] = useState(false)
   const [isRiskTypesCollapsed, setIsRiskTypesCollapsed] = useState(false)
-  const [isShieldActive, setIsShieldActive] = useState(false)
-  const [shieldTimeLeft, setShieldTimeLeft] = useState(0)
   const [glitchEffect, setGlitchEffect] = useState(false)
+
+  // Sync local state with props when they change
+  React.useEffect(() => {
+    setScore(gameScore || 0)
+  }, [gameScore])
+  
+  React.useEffect(() => {
+    setLives(gameLives || 3)
+  }, [gameLives])
+  
+  React.useEffect(() => {
+    setHealth(gameHealth || 3)
+  }, [gameHealth])
 
   // Count creatures by type for display
   const creatureCounts = useMemo(() => {
@@ -614,7 +683,7 @@ export default function FishtankGame({ characters, mousePos }) {
   // Shield countdown effect
   useEffect(() => {
     let shieldTimer;
-    if (isShieldActive && shieldTimeLeft > 0) {
+    if (isShieldActive && shieldTimeLeft > 0 && !isPaused) {
       shieldTimer = setInterval(() => {
         setShieldTimeLeft(prev => {
           if (prev <= 1) {
@@ -630,10 +699,11 @@ export default function FishtankGame({ characters, mousePos }) {
     return () => {
       if (shieldTimer) clearInterval(shieldTimer);
     };
-  }, [isShieldActive, shieldTimeLeft]);
+  }, [isShieldActive, shieldTimeLeft, isPaused]);
 
   const handleScoreUpdate = (newScore, points) => {
     setScore(newScore)
+    setGameScore(newScore) // Update parent state
     setRecentPoints(points)
     
     // Clear recent points after animation
@@ -642,14 +712,22 @@ export default function FishtankGame({ characters, mousePos }) {
 
   const handleLifeUpdate = (newLives) => {
     setLives(newLives)
+    setGameLives(newLives) // Update parent state
   }
 
   const handleHealthUpdate = (newHealth) => {
     setHealth(newHealth)
+    setGameHealth(newHealth) // Update parent state
     
     // Check for game over
     if (gameState.isGameOver) {
       setIsGameOver(true)
+      // Reset score to 0 when game over is detected
+      if (gameState.score === 0) {
+        setScore(0)
+        setGameScore(0)
+        console.log('🔄 UI score reset to 0 after game over')
+      }
     }
     
     // Trigger damage flash effect
@@ -659,26 +737,22 @@ export default function FishtankGame({ characters, mousePos }) {
 
   const handleHealthUpdateNoFlash = (newHealth) => {
     setHealth(newHealth)
+    setGameHealth(newHealth) // Update parent state
     
     // Check for game over without damage flash
     if (gameState.isGameOver) {
       setIsGameOver(true)
+      // Reset score to 0 when game over is detected
+      if (gameState.score === 0) {
+        setScore(0)
+        setGameScore(0)
+        console.log('🔄 UI score reset to 0 after game over (no flash)')
+      }
     }
   }
 
-  const handleBuyShield = () => {
-    if (score >= 100 && !isShieldActive) {
-      // Deduct points and activate shield
-      setScore(prevScore => prevScore - 100);
-      setIsShieldActive(true);
-      setShieldTimeLeft(10); // 10 seconds of protection
-      console.log('🛡️ Shield activated! 10 seconds of protection against Toxic Predators');
-      
-      // Show points deduction animation
-      setRecentPoints(-100);
-      setTimeout(() => setRecentPoints(null), 1500);
-    }
-  }
+  // Shield purchase is now handled at the Home component level
+  // This function can be removed or used for internal game logic if needed
 
   const handleRestart = () => {
     // Reset global game state
@@ -687,10 +761,15 @@ export default function FishtankGame({ characters, mousePos }) {
     // Reset local component state
     setScore(0)
     setLives(3)
-    setHealth(3)
+    setHealth(8) // Reset to 8 health (8 hits from Toxic Predator = 1 life lost)
     setIsGameOver(false)
     setRecentPoints(null)
     setDamageFlash(false)
+    
+    // Reset parent state
+    setGameScore(0)
+    setGameHealth(8)
+    setGameLives(3)
   }
 
   // Monitor game state for game over condition
@@ -740,7 +819,7 @@ export default function FishtankGame({ characters, mousePos }) {
           <div style={{
             fontSize: '4rem',
             marginBottom: '1rem',
-            background: 'linear-gradient(45deg, #ff6b6b, #ee5a24, #ff6b6b)',
+            background: 'linear-gradient(45deg,rgb(255, 107, 127),rgb(231, 36, 238),rgb(194, 25, 25))',
             backgroundClip: 'text',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
@@ -845,6 +924,7 @@ export default function FishtankGame({ characters, mousePos }) {
           onHealthUpdate={handleHealthUpdate}
           onHealthUpdateNoFlash={handleHealthUpdateNoFlash}
           isShieldActive={isShieldActive}
+          isPaused={isPaused}
         />
       </Canvas>
       
@@ -894,10 +974,89 @@ export default function FishtankGame({ characters, mousePos }) {
         }} />
       )}
       
+         {/* Hotkeys Helper */}
+      
+        <div className="hotkeys-guide" style={{
+           position: 'absolute',
+           top: '163px',
+           left: '20px',
+           width: '350px',
+          background: 'rgba(0, 0, 0, 0.7)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          borderRadius: '8px',
+          padding: '0.75rem',
+          fontSize: '0.8rem',
+          color: '#e0e0e0'
+        }}>
+          <div style={{ 
+            color: '#74b9ff', 
+            fontWeight: 'bold', 
+            marginBottom: '0.5rem',
+            fontSize: '0.85rem'
+          }}>
+            🎮 Hotkeys
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#ddd' }}>Shield Purchase:</span>
+              <kbd style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '4px',
+                padding: '0.2rem 0.5rem',
+                fontSize: '0.75rem',
+                color: '#fff',
+                fontFamily: 'monospace'
+              }}>SPACE</kbd>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#ddd' }}>Pause/Resume:</span>
+              <div style={{ display: 'flex', gap: '0.3rem' }}>
+                <kbd style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  borderRadius: '4px',
+                  padding: '0.2rem 0.5rem',
+                  fontSize: '0.75rem',
+                  color: '#fff',
+                  fontFamily: 'monospace'
+                }}>P</kbd>
+                <span style={{ color: '#888', fontSize: '0.75rem' }}>or</span>
+                <kbd style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  borderRadius: '4px',
+                  padding: '0.2rem 0.5rem',
+                  fontSize: '0.75rem',
+                  color: '#fff',
+                  fontFamily: 'monospace'
+                }}>Z</kbd>
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#ddd' }}>Move Character:</span>
+              <span style={{
+                fontSize: '0.75rem',
+                color: '#a0a0a0',
+                fontStyle: 'italic'
+              }}>Mouse</span>
+            </div>
+          </div>
+          <div style={{ 
+            marginTop: '0.5rem', 
+            paddingTop: '0.5rem', 
+            borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+            fontSize: '0.7rem',
+            color: '#b0b0b0',
+            lineHeight: '1.3'
+          }}>
+          </div>
+        </div>
+   
       {/* Transaction Types Description Card */}
       <div style={{
         position: 'absolute',
-        top: '163px',
+        top: '310px',
         left: '20px',
         width: '348px',
         background: 'linear-gradient(135deg, rgba(0, 30, 60, 0.9) 0%, rgba(0, 20, 40, 0.95) 100%)',
@@ -980,6 +1139,28 @@ export default function FishtankGame({ characters, mousePos }) {
         
         <div style={{ marginBottom: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <span style={{ fontSize: '1.5rem', marginRight: '0.5rem' }}>🐚</span>
+            <strong style={{ color: '#40e0d0' }}>Treasure Jellyfish</strong>
+            <span style={{ 
+              marginLeft: '0.5rem', 
+              fontSize: '0.8rem', 
+              background: 'rgba(64, 224, 208, 0.2)', 
+              color: '#40e0d0', 
+              padding: '0.2rem 0.6rem', 
+              borderRadius: '12px',
+              fontWeight: 'bold',
+              border: '1px solid rgba(64, 224, 208, 0.3)'
+            }}>
+              {creatureCounts["Treasure Jellyfish"]}
+            </span>
+          </div>
+          <p style={{ margin: '0 0 0 2rem', fontSize: '0.8rem', opacity: 0.9 }}>
+            <span style={{ color: '#00b894', fontWeight: 'bold' }}>COLLECTIBLE!</span> Sandwich attacks and front-running patterns. Collect these luminous jellyfish for bonus points!
+          </p>
+        </div>
+
+        <div style={{ marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}>
                           <span style={{ fontSize: '1.5rem', marginRight: '0.5rem' }}>🐡</span>
               <strong style={{ color: '#fdcb6e' }}>Pufferfish Trap</strong>
               <span style={{ 
@@ -1021,28 +1202,7 @@ export default function FishtankGame({ characters, mousePos }) {
             DEX swaps with extreme slippage (&gt;15%), creating dangerous turbulence in shallow pools or exotic coral reefs.
           </p>
         </div>
-        
-        <div style={{ marginBottom: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}>
-            <span style={{ fontSize: '1.5rem', marginRight: '0.5rem' }}>🐚</span>
-            <strong style={{ color: '#40e0d0' }}>Treasure Jellyfish</strong>
-            <span style={{ 
-              marginLeft: '0.5rem', 
-              fontSize: '0.8rem', 
-              background: 'rgba(64, 224, 208, 0.2)', 
-              color: '#40e0d0', 
-              padding: '0.2rem 0.6rem', 
-              borderRadius: '12px',
-              fontWeight: 'bold',
-              border: '1px solid rgba(64, 224, 208, 0.3)'
-            }}>
-              {creatureCounts["Treasure Jellyfish"]}
-            </span>
-          </div>
-          <p style={{ margin: '0 0 0 2rem', fontSize: '0.8rem', opacity: 0.9 }}>
-            <span style={{ color: '#00b894', fontWeight: 'bold' }}>COLLECTIBLE!</span> Sandwich attacks and front-running patterns. Collect these luminous jellyfish for bonus points!
-          </p>
-        </div>
+      
         
           <div style={{ 
             borderTop: '1px solid rgba(255,255,255,0.2)', 
@@ -1070,208 +1230,7 @@ export default function FishtankGame({ characters, mousePos }) {
         )}
       </div>
 
-      {/* Game UI Overlay */}
-      <div style={{
-        position: 'absolute',
-        bottom: '20px',
-        width: '443px',
-        right: '20px',
-        background: 'linear-gradient(135deg, rgba(0, 30, 60, 0.9) 0%, rgba(0, 20, 40, 0.95) 100%)',
-        border: '1px solid rgba(0, 255, 255, 0.3)',
-        boxShadow: '0 4px 20px rgba(0, 255, 255, 0.1)',
-        padding: '1.5rem',
-        borderRadius: '12px',
-        color: 'white',
-        fontSize: '1rem',
-        minWidth: '200px',
-        zIndex: 10
-      }}>
-        {/* Score */}
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between',
-          marginBottom: '1rem'
-        }}>
-          <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>SCORE</span>
-          <span style={{ 
-            fontSize: '1.5rem', 
-            fontWeight: 'bold', 
-            color: '#00ffff'
-          }}>
-            {score}
-          </span>
-        </div>
-        
-        {/* Recent points animation */}
-        {recentPoints && (
-          <div style={{
-            position: 'absolute',
-            top: '1rem',
-            right: '1rem',
-            color: '#00b894',
-            fontSize: '1.2rem',
-            fontWeight: 'bold',
-            animation: 'fadeInOut 1.5s ease-out',
-            pointerEvents: 'none'
-          }}>
-            +{recentPoints}
-          </div>
-        )}
-        
-        {/* Lives */}
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between',
-          marginBottom: '0.5rem'
-        }}>
-          <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>LIVES</span>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            {[...Array(3)].map((_, i) => (
-              <span 
-                key={i} 
-                style={{ 
-                  fontSize: '1.5rem',
-                  opacity: i < lives ? 1 : 0.3,
-                  transition: 'opacity 0.3s ease'
-                }}
-              >
-                ❤️
-              </span>
-            ))}
-          </div>
-        </div>
-        
-        {/* Health Progress Bar */}
-        <div style={{ marginBottom: '1rem' }}>
-          <div style={{ 
-            fontSize: '0.9rem', 
-            marginBottom: '0.5rem',
-            opacity: 0.8
-          }}>
-            Current Heart Health: {health}/3
-          </div>
-          <div style={{
-            width: '100%',
-            height: '8px',
-            backgroundColor: 'rgba(255,255,255,0.2)',
-            borderRadius: '4px',
-            overflow: 'hidden'
-          }}>
-            <div style={{
-              width: `${(health / 3) * 100}%`,
-              height: '100%',
-              backgroundColor: health > 2 ? '#00b894' : health > 1 ? '#fdcb6e' : '#ff6b6b',
-              transition: 'width 0.3s ease, background-color 0.3s ease',
-              borderRadius: '4px'
-            }} />
-          </div>
-          <div style={{ 
-            fontSize: '0.7rem', 
-            marginTop: '0.3rem',
-            opacity: 0.6,
-            textAlign: 'center'
-          }}>
-            🦈 3 hits from Toxic Predator = 1 life lost
-          </div>
-        </div>
-
-        {/* Shield Section */}
-        <div style={{ marginBottom: '1rem' }}>
-          {/* Shield Status */}
-          {isShieldActive && (
-            <div style={{
-              background: 'linear-gradient(135deg, rgba(0, 255, 255, 0.2) 0%, rgba(0, 150, 255, 0.2) 100%)',
-              border: '1px solid rgba(0, 255, 255, 0.4)',
-              borderRadius: '8px',
-              padding: '0.8rem',
-              marginBottom: '0.8rem',
-              textAlign: 'center',
-              boxShadow: '0 0 15px rgba(0, 255, 255, 0.3)'
-            }}>
-              <div style={{ 
-                fontSize: '1rem', 
-                fontWeight: 'bold',
-                color: '#00ffff',
-                marginBottom: '0.3rem'
-              }}>
-                🛡️ SHIELD ACTIVE
-              </div>
-              <div style={{ 
-                fontSize: '0.8rem', 
-                opacity: 0.8
-              }}>
-                Protection: {shieldTimeLeft}s remaining
-              </div>
-              <div style={{ 
-                fontSize: '0.7rem', 
-                opacity: 0.6,
-                marginTop: '0.2rem'
-              }}>
-                Blocking Toxic Predator & Pufferfish damage
-              </div>
-            </div>
-          )}
-
-          {/* Shield Purchase Button */}
-          <button
-            onClick={handleBuyShield}
-            disabled={score < 100 || isShieldActive}
-            style={{
-              width: '100%',
-              background: isShieldActive 
-                ? 'rgba(100, 100, 100, 0.3)' 
-                : score >= 100 
-                  ? 'linear-gradient(135deg, #00ffff 0%, #0096ff 100%)'
-                  : 'rgba(255, 255, 255, 0.2)',
-              border: 'none',
-              borderRadius: '8px',
-              padding: '12px 16px',
-              color: isShieldActive ? 'rgba(255, 255, 255, 0.5)' : 'white',
-              fontSize: '0.9rem',
-              fontWeight: 'bold',
-              cursor: isShieldActive || score < 100 ? 'not-allowed' : 'pointer',
-              transition: 'all 0.3s ease',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              opacity: isShieldActive || score < 100 ? 0.5 : 1
-            }}
-            onMouseEnter={(e) => {
-              if (!isShieldActive && score >= 100) {
-                e.target.style.boxShadow = '0 0 20px rgba(0, 255, 255, 0.4)'
-                e.target.style.transform = 'translateY(-1px)'
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isShieldActive && score >= 100) {
-                e.target.style.boxShadow = 'none'
-                e.target.style.transform = 'translateY(0)'
-              }
-            }}
-          >
-            <span style={{ fontSize: '1.1rem' }}>🛡️</span>
-            {isShieldActive 
-              ? 'Shield Active' 
-              : score >= 100 
-                ? 'Buy Shield (100 pts)' 
-                : `Need ${100 - score} more points`
-            }
-          </button>
-          
-          <div style={{ 
-            fontSize: '0.65rem', 
-            opacity: 0.6,
-            textAlign: 'center',
-            marginTop: '0.4rem'
-          }}>
-            💡 Shield protects against Toxic Predators & Pufferfish Traps for 10 seconds
-          </div>
-        </div>
-      
-      </div>
+   {/* here */}
       
       {/* Add CSS animations */}
       <style>{`

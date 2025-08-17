@@ -15,6 +15,12 @@ const PORT = process.env.PORT || 4000;
 app.use(cors());
 app.use(express.json());
 
+// Initialize CDP client
+const cdpClient = createCDPClient(
+  process.env.CDP_API_KEY_ID,
+  process.env.CDP_API_SECRET
+);
+
 // Blockchain setup
 const provider = new ethers.JsonRpcProvider(process.env.KATANA_RPC);
 
@@ -256,104 +262,60 @@ app.post('/api/fishtank/score/submit', async (req, res) => {
 
 // Coinbase CDP integration endpoints
 
-// Get token balances
+// GET /api/balances?address=0x... → CDP Token Balances (Base)
 app.get('/api/balances', async (req, res) => {
   try {
     const { address } = req.query;
     
-    if (!address) {
+    if (!address || typeof address !== 'string') {
       return res.status(400).json({ error: 'Address parameter is required' });
     }
-    
-    const addressStr = address as string;
-    
-    // More lenient address validation - check format and length
-    if (!addressStr.match(/^0x[a-fA-F0-9]{40}$/)) {
-      return res.status(400).json({ error: 'Valid address parameter is required' });
-    }
-    
-    // Normalize address to checksum format for consistency
-    const normalizedAddress = ethers.getAddress(addressStr.toLowerCase());
 
-    // Check if CDP credentials are available
-    const cdpKeyId = process.env.CDP_API_KEY_ID;
-    const cdpSecret = process.env.CDP_API_SECRET;
-    
-    if (!cdpKeyId || !cdpSecret) {
-      console.log('CDP credentials not found, returning mock data');
-      // Return mock data when CDP is not configured
-      return res.json({
-        balances: [
-          {
-            symbol: 'USDC',
-            network: 'base',
-            value: '25.50',
-            valueUSD: 25.50,
-            contractAddress: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'
-          },
-          {
-            symbol: 'ETH',
-            network: 'base',
-            value: '0.0123',
-            valueUSD: 40.25
-          }
-        ]
-      });
+    // Validate Ethereum address format
+    if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+      return res.status(400).json({ error: 'Invalid Ethereum address format' });
     }
 
-    const cdpClient = createCDPClient(cdpKeyId, cdpSecret);
-    const balances = await cdpClient.getTokenBalances(normalizedAddress, 'base');
+    console.log(`Fetching balances for address: ${address}`);
+    const balances = await cdpClient.getTokenBalances(address, 'base');
     
     res.json(balances);
-  } catch (error: any) {
-    console.error('Error fetching balances:', error?.message || error);
+  } catch (error) {
+    console.error('Balance fetch error:', error);
     res.status(500).json({ error: 'Failed to fetch balances' });
   }
 });
 
-// Get Coinbase onramp URL
-app.get('/api/onramp-url', async (req, res) => {
+// GET /api/onramp-url?address=0x... → returns hosted Onramp URL
+app.get('/api/onramp-url', (req, res) => {
   try {
     const { address } = req.query;
-    console.log('📍 Onramp request received:', { address, query: req.query });
     
-    if (!address) {
-      console.log('❌ No address provided');
+    if (!address || typeof address !== 'string') {
       return res.status(400).json({ error: 'Address parameter is required' });
     }
-    
-    const addressStr = address as string;
-    
-    // More lenient address validation - check format and length
-    if (!addressStr.match(/^0x[a-fA-F0-9]{40}$/)) {
-      console.log('❌ Invalid address format:', addressStr);
-      return res.status(400).json({ error: 'Valid address parameter is required' });
-    }
-    
-    // Normalize address to checksum format for consistency
-    const normalizedAddress = ethers.getAddress(addressStr.toLowerCase());
-    console.log('✅ Normalized address:', normalizedAddress);
 
-    const projectId = process.env.COINBASE_PROJECT_ID || 'fishtank-liquidity-hunter';
-    
-    // Build Coinbase Pay URL with prefilled parameters
+    // Updated Coinbase Onramp URL with new API parameters
     const onrampUrl = new URL('https://pay.coinbase.com/buy/select-asset');
-    onrampUrl.searchParams.set('appId', projectId);
-    onrampUrl.searchParams.set('destinationWallet', normalizedAddress);
-    onrampUrl.searchParams.set('assets', 'USDC');
-    onrampUrl.searchParams.set('networks', 'base');
+    
+    // Use new API parameters (addresses and assets instead of destinationWallets)
+    onrampUrl.searchParams.set('addresses', JSON.stringify({
+      [address]: ['base']
+    }));
+    onrampUrl.searchParams.set('assets', JSON.stringify(['USDC']));
     onrampUrl.searchParams.set('defaultAsset', 'USDC');
     onrampUrl.searchParams.set('defaultNetwork', 'base');
-    onrampUrl.searchParams.set('defaultPaymentMethod', 'ACH_BANK_ACCOUNT,DEBIT_CARD');
-
-    console.log(`🏦 Generated onramp URL for ${normalizedAddress}`);
+    onrampUrl.searchParams.set('defaultPaymentMethod', 'CARD');
     
+    // Add appId (Project ID) from environment variables
+    onrampUrl.searchParams.set('appId', process.env.COINBASE_PROJECT_ID || 'fishtank-liquidity-hunter');
+
     res.json({
       url: onrampUrl.toString(),
       message: 'Open this URL to buy USDC on Base'
     });
-  } catch (error: any) {
-    console.error('Error generating onramp URL:', error?.message || error);
+  } catch (error) {
+    console.error('Onramp URL error:', error);
     res.status(500).json({ error: 'Failed to generate onramp URL' });
   }
 });

@@ -141,7 +141,7 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
       "Pufferfish Trap": "#fdcb6e", 
       "Turbulent Current": "#00bfff",
       "Treasure Jellyfish": "#40e0d0",  // This is the collectible one!
-      "Standard Transaction": "#00b894"
+      "Standard Current": "#00b894"
     }
     return colorMap[characterName] || "#ffffff"
   }
@@ -593,7 +593,7 @@ export default function FishtankGame({ characters, mousePos }) {
         "Pufferfish Trap": 0,
         "Turbulent Current": 0,
         "Treasure Jellyfish": 0,
-        "Standard Transaction": 0
+        "Standard Current": 0
       };
     }
     
@@ -607,7 +607,7 @@ export default function FishtankGame({ characters, mousePos }) {
       "Pufferfish Trap": counts["Pufferfish Trap"] || 0,
       "Turbulent Current": counts["Turbulent Current"] || 0,
       "Treasure Jellyfish": counts["Treasure Jellyfish"] || 0,
-      "Standard Transaction": counts["Standard Transaction"] || 0
+      "Standard Current": counts["Standard Current"] || 0
     };
   }, [characters])
 

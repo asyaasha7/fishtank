@@ -6,55 +6,76 @@ import FishtankGame from './AviatorGame'
 import { HUD } from './HUD'
 import { PaymentModal } from './PaymentModal'
 import { useWallet } from '../hooks/useWallet'
-import { fetchAndAnalyzeTransactions } from '../services/ethereumApi'
-import { scoreRisk } from '../utils/riskScoring'
+import { fetchAndAnalyzeTransactions, getRiskyTransactionsForGame } from '../services/ethereumApi'
+import { scoreRisk, categorizeBlockscoutTransaction, scoreBlockscoutTransaction } from '../utils/riskScoring'
 import { recordRiskEvent, recordHealthRefill, submitScore } from '../chain/fishtank'
 
-// Convert transaction to character format with improved creature distribution
+// Convert transaction to character format using enhanced categorization
 function transactionToCharacter(tx) {
-  const riskAnalysis = scoreRisk(tx)
+  // Use the enhanced Blockscout categorization if available
+  let category;
+  let riskAnalysis;
   
-  // Determine character type based on transaction characteristics and risk
-  let characterType = "Standard Transaction"
+  if (tx.from && typeof tx.from === 'object' && tx.from.hash) {
+    // This is Blockscout format data - use new categorization
+    category = categorizeBlockscoutTransaction(tx);
+    riskAnalysis = scoreBlockscoutTransaction(tx);
+  } else {
+    // This is legacy format data
+    riskAnalysis = scoreRisk(tx);
+  }
   
-  // High-risk transactions become Toxic Predators (much stricter criteria)
-  if (riskAnalysis.risk >= 80 || 
-      (tx.typeHints?.includes("Transfer") && tx.token?.notAllowlisted && riskAnalysis.risk >= 60) ||
-      (tx.token && !tx.token.verified && riskAnalysis.risk >= 60) ||
-      (tx.token?.contractAgeDays && tx.token.contractAgeDays < 1) ||
-      tx.lists?.addressOnBlocklist ||
-      tx.category === "Scam Token Transfer") {
-    characterType = "Toxic Predator"
-    console.log('🦈 Creating Toxic Predator:', tx.id, 'Risk:', riskAnalysis.risk, 'Category:', tx.category, 'Token:', tx.token)
-  } 
-  // MEV/Sandwich attacks become valuable Treasure Jellyfish
-  else if (tx.mev?.isSandwichLeg || 
-           tx.mev?.bundlePosition || 
-           (riskAnalysis.risk >= 40 && tx.typeHints?.includes("MEV"))) {
-    characterType = "Treasure Jellyfish"
-  }
-  // Approval transactions become Pufferfish Traps
-  else if (tx.approval?.method === "approve" || 
-           tx.typeHints?.includes("Approval")) {
-    characterType = "Pufferfish Trap"
-  }
-  // Swap transactions with slippage become Turbulent Current
-  else if (tx.typeHints?.includes("Swap") || 
-           tx.dex?.name || 
-           (tx.slippage && tx.slippage > 5)) {
-    characterType = "Turbulent Current"
-  }
-  // Medium risk transactions very rarely become Toxic Predators (much reduced frequency)
-  else if (riskAnalysis.risk >= 60 && Math.random() < 0.05) {
-    characterType = "Toxic Predator"
-    console.log('🦈 Creating Toxic Predator (medium risk):', tx.id, 'Risk:', riskAnalysis.risk)
+  // Map new categories to game character types
+  let characterType = "Standard Current";
+  
+  if (category) {
+    // Use the new categorization system
+    switch(category.riskLevel) {
+      case "CRITICAL":
+      case "HIGH":
+        if (category.category === "Malicious Activity") {
+          characterType = "Toxic Predator";
+        } else if (category.category === "Token Approval") {
+          characterType = "Pufferfish Trap";
+        } else if (category.category === "Failed Transaction") {
+          characterType = "Pufferfish Trap";
+        } else {
+          characterType = "Chaotic Vortex";
+        }
+        break;
+      case "MODERATE":
+        if (category.category === "DeFi Trading" || category.category === "MEV Activity") {
+          characterType = "Treasure Jellyfish";
+        } else if (category.category === "Cross-chain Bridge") {
+          characterType = "Chaotic Vortex";
+        } else {
+          characterType = "Standard Current";
+        }
+        break;
+      case "LOW":
+      default:
+        characterType = "Standard Current";
+        break;
+    }
+  } else {
+    // Fallback to old logic for legacy data
+    if (riskAnalysis.risk >= 80) {
+      characterType = "Toxic Predator";
+    } else if (riskAnalysis.risk >= 40) {
+      characterType = "Treasure Jellyfish";
+    } else if (tx.typeHints?.includes("Approval")) {
+      characterType = "Pufferfish Trap";
+    } else if (tx.typeHints?.includes("Swap") && tx.slippage > 15) {
+      characterType = "Chaotic Vortex";
+    }
   }
   
   return {
-    id: tx.id,
+    id: tx.id || tx.transaction_hash || tx.hash || `tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     name: characterType,
     transaction: tx,
-    riskAnalysis: riskAnalysis
+    riskAnalysis: riskAnalysis || { risk: 0 },
+    category: category
   }
 }
 
@@ -62,7 +83,7 @@ function Home() {
   const [characters, setCharacters] = useState([])
   const [loading, setLoading] = useState(true)
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
-  const [refreshCountdown, setRefreshCountdown] = useState(10)
+  const [refreshCountdown, setRefreshCountdown] = useState(30)
   const [isAutoRefreshing, setIsAutoRefreshing] = useState(false)
   const [selectedChain] = useState('katana')
   
@@ -74,7 +95,24 @@ function Home() {
   const [isShieldActive, setIsShieldActive] = useState(false)
   const [shieldTimeLeft, setShieldTimeLeft] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
+  const [gameEvents, setGameEvents] = useState([]) // Store game console events
   const wallet = useWallet()
+
+  // Function to add events to the game console
+  const addGameEvent = (message, type = 'info') => {
+    const timestamp = new Date().toLocaleTimeString();
+    const newEvent = {
+      id: Date.now() + Math.random(),
+      message,
+      type, // 'info', 'damage', 'points', 'collision'
+      timestamp
+    };
+    
+    setGameEvents(prev => {
+      const updated = [newEvent, ...prev];
+      return updated.slice(0, 50); // Keep only last 50 events
+    });
+  };
 
   useEffect(() => {
     // Only start the game if wallet is connected
@@ -120,20 +158,20 @@ function Home() {
 
     document.addEventListener('keydown', handleKeyPress)
     
-    // Set up automatic refresh every 10 seconds (pauses when game is paused)
+    // Set up automatic refresh every 30 seconds (pauses when game is paused)
     const refreshInterval = setInterval(() => {
       if (!isPaused) {
         console.log('🔄 Auto-refreshing transactions...')
         setIsAutoRefreshing(true)
         loadTransactions(false) // Smooth refresh
       }
-    }, 10000) // 10 seconds
+    }, 30000) // 30 seconds
     
     // Countdown timer that updates every second
     const countdownInterval = setInterval(() => {
       setRefreshCountdown(prev => {
         if (prev <= 1) {
-          return 10 // Reset to 10 when it reaches 0
+          return 30 // Reset to 30 when it reaches 0
         }
         return prev - 1
       })
@@ -154,7 +192,7 @@ function Home() {
       if (isInitialLoad) {
         setLoading(true)
         console.log(`🎲 Loading initial transactions for 3D cube visualization from ${selectedChain.toUpperCase()}...`)
-        const transactions = await fetchAndAnalyzeTransactions(40, selectedChain)
+        const transactions = await getRiskyTransactionsForGame(60, selectedChain)
         const characterList = transactions.map(transactionToCharacter)
         console.log('🎯 Generated characters:', characterList.map(c => c.name))
         console.log('🦈 Toxic Predators found:', characterList.filter(c => c.name === "Toxic Predator").length)
@@ -173,10 +211,21 @@ function Home() {
           : (transactions[0]?.id?.includes('etherscan') ? 'Etherscan API' : 'Ethereum Simulation')
         
         console.log(`✅ Loaded ${characterList.length} initial transaction cubes from ${selectedChain.toUpperCase()} (${dataSource})`)
+        addGameEvent(`🎮 Game Started - Loaded ${characterList.length} transaction creatures from ${selectedChain.toUpperCase()}`, 'info');
+        
+        // Count and log toxic predators
+        const toxicPredatorCount = characterList.filter(c => c.name === "Toxic Predator").length;
+        const syntheticCount = characterList.filter(c => c.transaction?.synthetic).length;
+        if (syntheticCount > 0) {
+          addGameEvent(`💀 Auto-generated ${syntheticCount} synthetic Toxic Predators for challenging gameplay`, 'info');
+        }
+        if (toxicPredatorCount > 0) {
+          addGameEvent(`🦈 ${toxicPredatorCount} Toxic Predators prowling the depths - Stay alert!`, 'info');
+        }
       } else {
         // Smooth refresh - fetch new transactions and add to existing array
         console.log(`🔄 Fetching new transactions from ${selectedChain} for smooth update...`)
-        const newTransactions = await fetchAndAnalyzeTransactions(6, selectedChain) // Fetch fewer for updates
+        const newTransactions = await getRiskyTransactionsForGame(10, selectedChain) // Fetch fewer for updates
         const newCharacterList = newTransactions.map(transactionToCharacter)
         
         setCharacters(prevCharacters => {
@@ -207,7 +256,7 @@ function Home() {
     } finally {
       setLoading(false)
       setIsAutoRefreshing(false)
-      setRefreshCountdown(10) // Reset countdown after loading
+      setRefreshCountdown(30) // Reset countdown after loading
     }
   }
 
@@ -532,6 +581,7 @@ function Home() {
             isAutoRefreshing={isAutoRefreshing}
             refreshCountdown={refreshCountdown}
             charactersCount={characters ? characters.length : 0}
+            addGameEvent={addGameEvent}
           />
         </div>
       )}
@@ -551,6 +601,56 @@ function Home() {
         creatureCount={characters ? characters.length : 0}
         isPaused={isPaused}
       />
+
+      {/* Game Events Console */}
+      <div style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: '120px',
+        background: 'rgba(0, 0, 0, 0.85)',
+        backdropFilter: 'blur(10px)',
+        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+        color: '#ffffff',
+        fontFamily: 'monospace',
+        fontSize: '11px',
+        overflowY: 'auto',
+        padding: '8px 12px',
+        zIndex: 1000
+      }}>
+        <div style={{
+          fontSize: '12px',
+          fontWeight: 'bold',
+          marginBottom: '4px',
+          color: '#74b9ff',
+          borderBottom: '1px solid rgba(116, 185, 255, 0.3)',
+          paddingBottom: '4px'
+        }}>
+          🎮 Game Events Console
+        </div>
+        <div style={{ height: '85px', overflowY: 'auto' }}>
+          {gameEvents.length === 0 ? (
+            <div style={{ color: '#888', fontStyle: 'italic' }}>
+              Waiting for game events...
+            </div>
+          ) : (
+            gameEvents.map(event => (
+              <div 
+                key={event.id} 
+                style={{
+                  marginBottom: '2px',
+                  color: event.type === 'damage' ? '#ff6b6b' : 
+                         event.type === 'points' ? '#00b894' :
+                         event.type === 'collision' ? '#fdcb6e' : '#ffffff'
+                }}
+              >
+                <span style={{ color: '#888' }}>[{event.timestamp}]</span> {event.message}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
 
       {/* Payment Modal */}
       <PaymentModal

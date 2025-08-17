@@ -13,7 +13,7 @@ function TransactionCube({ character, position, speed, scale }) {
       "Pufferfish Trap": "#fdcb6e", 
       "Turbulent Current": "#00bfff",
       "Treasure Jellyfish": "#40e0d0",
-      "Standard Transaction": "#00b894"
+      "Standard Current": "#00b894"
     }
     return colorMap[characterName] || "#ffffff"
   }
@@ -172,7 +172,8 @@ export default function TransactionCubes({ characters }) {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', margin: '0.3rem 0' }}>
             <div style={{ width: '12px', height: '12px', background: '#00b894', marginRight: '0.5rem' }}></div>
-            Standard Transaction
+            Standard Current
+
           </div>
         </div>
       </div>

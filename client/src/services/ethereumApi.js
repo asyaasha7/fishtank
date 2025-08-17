@@ -1,7 +1,7 @@
 // Ethereum API service for fetching real transaction data
 // Using multiple data sources: Etherscan, public APIs, and blockchain explorers
 
-import { scoreRisk } from '../utils/riskScoring.js';
+import { scoreRisk, scoreBlockscoutTransaction } from '../utils/riskScoring.js';
 
 // Multi-chain API configuration
 const ETHERSCAN_API_KEY = import.meta.env.VITE_ETHERSCAN_API_KEY;
@@ -63,7 +63,7 @@ const ETHEREUM_APIS = CHAIN_CONFIGS.ethereum.apis;
 const POPULAR_ADDRESSES = CHAIN_CONFIGS.ethereum.popularAddresses;
 
 // Multi-chain transaction fetching
-export async function fetchRecentTransactions(address = null, count = 10, chain = 'ethereum') {
+export async function fetchRecentTransactions(address = null, count = 60, chain = 'katana') {
   const chainConfig = CHAIN_CONFIGS[chain];
   if (!chainConfig) {
     throw new Error(`Unsupported chain: ${chain}`);
@@ -231,19 +231,33 @@ async function fetchKatanaFromNativeAPI(count) {
         if (transactions && transactions.length > 0) {
           console.log(`✅ Found ${transactions.length} transactions from native API endpoint: ${url}`);
           
-          // Transform Conduit Explorer API format to our standard format
+          // Transform Blockscout API format to our game format
           const transformedTxs = transactions.slice(0, count).map((tx, index) => {
             return {
-              hash: tx.hash || `0x${Math.random().toString(16).substring(2, 10)}...`,
-              from: tx.from?.hash || tx.from_address || chainConfig.popularAddresses[0],
-              to: tx.to?.hash || tx.to_address || chainConfig.popularAddresses[1],
-              value: tx.value || (Math.random() * 10).toFixed(6),
+              // Core transaction data
+              hash: tx.transaction_hash || tx.hash || `0x${Math.random().toString(16).substring(2, 10)}...`,
+              from: tx.from,
+              to: tx.to,
+              value: tx.value || "0",
               blockNumber: tx.block_number || (1000000 + index),
               timeStamp: tx.timestamp ? new Date(tx.timestamp).getTime() / 1000 : Math.floor(Date.now() / 1000) - (index * 60),
-              methodId: tx.decoded_input?.method_id || tx.raw_input?.substring(0, 10) || '0x',
-              functionName: tx.method || tx.decoded_input?.method_call?.split('(')[0] || 'Transfer',
-              isError: tx.status === 'error' || tx.result === 'error' ? '1' : '0',
-              typeHints: assignKatanaTypeHints(tx)
+              
+              // Blockscout specific data
+              gas_limit: tx.gas_limit,
+              success: tx.success,
+              type: tx.type,
+              index: tx.index,
+              block_index: tx.block_index,
+              transaction_index: tx.transaction_index,
+              
+              // Error handling
+              isError: tx.success === false ? '1' : '0',
+              error: tx.error,
+              
+              // Legacy compatibility
+              methodId: '0x',
+              functionName: tx.type || 'Internal',
+              typeHints: assignBlockscoutTypeHints(tx)
             };
           });
           
@@ -337,6 +351,47 @@ function assignKatanaTypeHints(tx) {
   } else {
     return ['Contract', 'Unknown'];
   }
+}
+
+// New function for Blockscout transactions
+function assignBlockscoutTypeHints(tx) {
+  const fromName = tx.from?.name?.toLowerCase() || '';
+  const toName = tx.to?.name?.toLowerCase() || '';
+  const txType = tx.type?.toLowerCase() || '';
+  
+  // Type hints based on contract names and transaction types
+  if (fromName.includes('uniswap') || toName.includes('uniswap') || 
+      fromName.includes('router') || toName.includes('router')) {
+    return ['Swap', 'DeFi', 'Router'];
+  }
+  
+  if (fromName.includes('usdc') || toName.includes('usdc') ||
+      fromName.includes('tether') || toName.includes('tether') ||
+      fromName.includes('weth') || toName.includes('weth')) {
+    return ['Transfer', 'Token', 'Stablecoin'];
+  }
+  
+  if (txType === 'delegatecall') {
+    return ['Proxy', 'DelegateCall'];
+  }
+  
+  if (txType === 'staticcall') {
+    return ['Query', 'StaticCall'];
+  }
+  
+  if (txType === 'call') {
+    return ['Call', 'Contract'];
+  }
+  
+  if (tx.from?.is_scam || tx.to?.is_scam) {
+    return ['Scam', 'Malicious'];
+  }
+  
+  if (!tx.success) {
+    return ['Failed', 'Error'];
+  }
+  
+  return ['Internal', 'Standard'];
 }
 
 // Fetch Katana transactions using Etherscan V2 unified API
@@ -1262,6 +1317,193 @@ export function parseTransactionData(rawTransaction) {
   };
 }
 
+// Function to fetch combined transactions (both regular and internal) for maximum variety
+async function fetchCombinedTransactions(count = 50, chain = 'katana') {
+  try {
+    const response = await fetch(`/api/blockscout-proxy?type=combined&limit=${count}&chain=${chain}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    
+    if (data.items && Array.isArray(data.items)) {
+      console.log(`🎲 Fetched ${data.items.length} combined transactions (${data.transaction_types?.join(' + ') || 'mixed'})`);
+      return data.items;
+    }
+    return [];
+  } catch (error) {
+    console.error('Error fetching combined transactions:', error);
+    return [];
+  }
+}
+
+// Function to generate synthetic Toxic Predator transactions for gameplay
+function generateToxicPredators(count) {
+  const toxicPredators = [];
+  const scamTokens = [
+    'RUGPULL', 'PONZI', 'SCAM', 'FAKE', 'HONEYPOT', 'DRAIN', 'EXPLOIT', 'PHISH'
+  ];
+  
+  for (let i = 0; i < count; i++) {
+    const tokenName = scamTokens[Math.floor(Math.random() * scamTokens.length)];
+    const predator = {
+      id: `toxic_predator_${Date.now()}_${i}`,
+      hash: `0x${Math.random().toString(16).substr(2, 64)}`,
+      from: {
+        hash: `0x${Math.random().toString(16).substr(2, 40)}`,
+        name: `Scam_Contract_${i}`,
+        is_contract: true,
+        is_scam: true,
+        is_verified: false
+      },
+      to: {
+        hash: `0x${Math.random().toString(16).substr(2, 40)}`,
+        name: `${tokenName}_Token`,
+        is_contract: true,
+        is_scam: true,
+        is_verified: false
+      },
+      value: (Math.random() * 1000).toString(),
+      success: Math.random() > 0.3, // 70% success rate
+      type: 'call',
+      gas_price: (Math.random() * 100000000000).toString(),
+      transaction_type: 'synthetic',
+      synthetic: true,
+      decoded_input: {
+        method_call: Math.random() > 0.5 ? 'transfer()' : 'approve()',
+        method_id: Math.random() > 0.5 ? '0xa9059cbb' : '0x095ea7b3'
+      },
+      token_transfers: [{
+        token: {
+          name: `${tokenName}_Token`,
+          symbol: tokenName,
+          verified: false
+        },
+        value: (Math.random() * 1000000).toString()
+      }]
+    };
+    
+    toxicPredators.push(predator);
+  }
+  
+  return toxicPredators;
+}
+
+// Enhanced function to get diverse transactions for gameplay
+export async function getRiskyTransactionsForGame(count = 25, chain = 'katana') {
+  try {
+    console.log(`🎯 Fetching ${count} transactions for game from ${chain} network`);
+    
+    // Fetch combined transactions (regular + internal) for maximum variety
+    const combinedTransactions = await fetchCombinedTransactions(count * 2, chain);
+    const analyzedTransactions = combinedTransactions.map(parseTransactionData);
+    
+    // Categorize all transactions with both risky and non-risky
+    const categorizedTransactions = analyzedTransactions.map(tx => {
+      // Use new Blockscout scoring if this is Blockscout data
+      if (tx.from && typeof tx.from === 'object' && tx.from.hash) {
+        // This is Blockscout format data
+        const riskAnalysis = scoreBlockscoutTransaction(tx);
+        return {
+          ...tx,
+          riskAnalysis,
+          category: riskAnalysis.category
+        };
+      } else {
+        // This is legacy format data
+        const riskAnalysis = scoreRisk(tx);
+        return {
+          ...tx,
+          riskAnalysis,
+          category: riskAnalysis.category || { riskLevel: riskAnalysis.label }
+        };
+      }
+    });
+
+    // Prioritize risky transactions, but include non-risky as fallback
+    const riskyTransactions = categorizedTransactions.filter(tx => 
+      (tx.riskAnalysis.risk || 0) >= 15 || 
+      ['HIGH', 'CRITICAL'].includes(tx.category.riskLevel)
+    );
+    
+    const nonRiskyTransactions = categorizedTransactions.filter(tx => 
+      (tx.riskAnalysis.risk || 0) < 15 && 
+      !['HIGH', 'CRITICAL'].includes(tx.category.riskLevel)
+    );
+    
+    console.log(`🔍 Found ${riskyTransactions.length} risky + ${nonRiskyTransactions.length} non-risky transactions from ${analyzedTransactions.length} total`);
+    
+    // Use risky transactions first, then fill with non-risky if needed
+    let selectedTransactions = [...riskyTransactions];
+    if (selectedTransactions.length < count) {
+      const needed = count - selectedTransactions.length;
+      selectedTransactions.push(...nonRiskyTransactions.slice(0, needed));
+      console.log(`📈 Added ${Math.min(needed, nonRiskyTransactions.length)} non-risky transactions to reach target count`);
+    } else {
+      selectedTransactions = selectedTransactions.slice(0, count);
+    }
+    
+    // Check if we have enough Toxic Predators for interesting gameplay
+    const minToxicPredators = Math.max(2, Math.floor(count * 0.15)); // At least 15% should be toxic predators, minimum 2
+    
+    // Count current toxic predators by checking which transactions would become toxic predators
+    const currentToxicPredators = selectedTransactions.filter(tx => {
+      // Check if this transaction would be categorized as a Toxic Predator
+      if (tx.from?.is_scam || tx.to?.is_scam) return true;
+      if (tx.category?.riskLevel === 'CRITICAL') return true;
+      if (tx.category?.category === 'Malicious Activity') return true;
+      if ((tx.riskAnalysis?.risk || 0) >= 80) return true;
+      return false;
+    }).length;
+    
+    console.log(`🦈 Found ${currentToxicPredators} Toxic Predators, need at least ${minToxicPredators} for interesting gameplay`);
+    
+    // Auto-generate Toxic Predators if we don't have enough
+    if (currentToxicPredators < minToxicPredators) {
+      const neededPredators = minToxicPredators - currentToxicPredators;
+      console.log(`🎯 Auto-generating ${neededPredators} synthetic Toxic Predators for challenging gameplay`);
+      
+      const syntheticPredators = generateToxicPredators(neededPredators);
+      const parsedPredators = syntheticPredators.map(parseTransactionData);
+      
+      // Replace some of the least interesting transactions with toxic predators
+      if (selectedTransactions.length >= count) {
+        // Remove some standard current transactions to make room
+        const standardCurrentIndices = [];
+        selectedTransactions.forEach((tx, index) => {
+          if (!tx.category || tx.category.riskLevel === 'LOW') {
+            standardCurrentIndices.push(index);
+          }
+        });
+        
+        // Remove the needed number of standard transactions
+        for (let i = 0; i < Math.min(neededPredators, standardCurrentIndices.length); i++) {
+          selectedTransactions.splice(standardCurrentIndices[i] - i, 1);
+        }
+      }
+      
+      selectedTransactions.push(...parsedPredators);
+      console.log(`💀 Added ${neededPredators} synthetic Toxic Predators! Total transactions: ${selectedTransactions.length}`);
+    }
+    
+    // If we still don't have enough transactions, add some enhanced simulation ones
+    if (selectedTransactions.length < count) {
+      const needed = count - selectedTransactions.length;
+      console.log(`📊 Adding ${needed} enhanced transactions to meet target count`);
+      
+      const enhancedRiskyTxs = generateEnhancedRiskyTransactions(needed);
+      const parsedEnhancedTxs = enhancedRiskyTxs.map(parseTransactionData);
+      selectedTransactions.push(...parsedEnhancedTxs);
+    }
+    
+    return selectedTransactions.slice(0, count);
+  } catch (error) {
+    console.error('Error getting game transactions:', error);
+    // Fallback to regular function
+    return fetchAndAnalyzeTransactions(count, chain);
+  }
+}
+
 // Fetch and analyze recent transactions, filtering for risk score > 0
 export async function fetchAndAnalyzeTransactions(count = 10, chain = 'ethereum') {
   try {
@@ -1270,29 +1512,71 @@ export async function fetchAndAnalyzeTransactions(count = 10, chain = 'ethereum'
       console.warn('⚠️ No Etherscan API key found in environment variables');
     }
     
-    // Fetch more transactions than needed since we'll filter for risky ones
-    const rawTransactions = await fetchRecentTransactions(null, count * 3, chain);
+    // Fetch combined transactions for variety (will fall back to fetchRecentTransactions if needed)
+    let rawTransactions;
+    if (chain === 'katana') {
+      rawTransactions = await fetchCombinedTransactions(count * 3, chain);
+    } else {
+      rawTransactions = await fetchRecentTransactions(null, count * 3, chain);
+    }
     const analyzedTransactions = rawTransactions.map(parseTransactionData);
     
-    // Filter for transactions with risk score > 0
-    const riskyTransactions = analyzedTransactions.filter(tx => {
-      const riskAnalysis = scoreRisk(tx);
-      return riskAnalysis.risk > 0;
+    // Categorize all transactions with both risky and non-risky
+    const categorizedTransactions = analyzedTransactions.map(tx => {
+      // Use new Blockscout scoring if this is Blockscout data
+      if (tx.from && typeof tx.from === 'object' && tx.from.hash) {
+        // This is Blockscout format data
+        const riskAnalysis = scoreBlockscoutTransaction(tx);
+        return {
+          ...tx,
+          riskAnalysis,
+          category: riskAnalysis.category
+        };
+      } else {
+        // This is legacy format data
+        const riskAnalysis = scoreRisk(tx);
+        return {
+          ...tx,
+          riskAnalysis,
+          category: riskAnalysis.category || { riskLevel: riskAnalysis.label }
+        };
+      }
     });
+
+    // Prioritize risky transactions, but include non-risky as fallback
+    const riskyTransactions = categorizedTransactions.filter(tx => 
+      (tx.riskAnalysis.risk || 0) >= 15 || 
+      ['HIGH', 'CRITICAL'].includes(tx.category.riskLevel)
+    );
     
-    console.log(`🔍 Filtered ${riskyTransactions.length} risky transactions from ${analyzedTransactions.length} total`);
+    const nonRiskyTransactions = categorizedTransactions.filter(tx => 
+      (tx.riskAnalysis.risk || 0) < 15 && 
+      !['HIGH', 'CRITICAL'].includes(tx.category.riskLevel)
+    );
     
-    // If we don't have enough risky transactions, add some enhanced simulation ones
-    if (riskyTransactions.length < count) {
-      const needed = count - riskyTransactions.length;
+    console.log(`🔍 Found ${riskyTransactions.length} risky + ${nonRiskyTransactions.length} non-risky transactions from ${analyzedTransactions.length} total`);
+    
+    // Use risky transactions first, then fill with non-risky if needed
+    let selectedTransactions = [...riskyTransactions];
+    if (selectedTransactions.length < count) {
+      const needed = count - selectedTransactions.length;
+      selectedTransactions.push(...nonRiskyTransactions.slice(0, needed));
+      console.log(`📈 Added ${Math.min(needed, nonRiskyTransactions.length)} non-risky transactions to reach target count`);
+    } else {
+      selectedTransactions = selectedTransactions.slice(0, count);
+    }
+    
+    // If we still don't have enough transactions, add some enhanced simulation ones
+    if (selectedTransactions.length < count) {
+      const needed = count - selectedTransactions.length;
       console.log(`📊 Adding ${needed} enhanced risky transactions to meet target count`);
       
       const enhancedRiskyTxs = generateEnhancedRiskyTransactions(needed);
       const parsedEnhancedTxs = enhancedRiskyTxs.map(parseTransactionData);
-      riskyTransactions.push(...parsedEnhancedTxs);
+      selectedTransactions.push(...parsedEnhancedTxs);
     }
     
-    return riskyTransactions.slice(0, count);
+    return selectedTransactions.slice(0, count);
   } catch (error) {
     console.error('Error analyzing transactions:', error);
     throw error;

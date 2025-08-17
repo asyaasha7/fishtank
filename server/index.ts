@@ -298,16 +298,31 @@ app.get('/api/katana/stats', async (req, res) => {
   }
 });
 
-// GET /api/transactions?limit=10 → Proxy to Blockscout API to bypass CORS
+// GET /api/transactions?limit=10&type=internal&chain=katana → Proxy to Blockscout API to bypass CORS
 app.get('/api/transactions', async (req, res) => {
   try {
     const limit = req.query.limit || '10';
-    // Use the working Blockscout API endpoint instead of Katana
-    const blockscoutApiUrl = `https://eth.blockscout.com/api/v2/internal-transactions`;
+    const type = req.query.type || 'internal'; // 'internal' or 'regular'
+    const chain = req.query.chain || 'ethereum';
     
-    console.log(`🗡️ Proxying Blockscout API request: ${blockscoutApiUrl}`);
+    // Determine the base URL based on chain
+    let baseUrl = 'https://eth.blockscout.com/api/v2';
+    if (chain === 'katana') {
+      // For Katana, we'll use the working Ethereum endpoint as proxy
+      baseUrl = 'https://eth.blockscout.com/api/v2';
+    }
     
-    const response = await fetch(blockscoutApiUrl, {
+    // Build the appropriate endpoint
+    let endpoint;
+    if (type === 'internal') {
+      endpoint = `${baseUrl}/internal-transactions`;
+    } else {
+      endpoint = `${baseUrl}/transactions`;
+    }
+    
+    console.log(`🗡️ Proxying Blockscout API request: ${endpoint} (type: ${type}, chain: ${chain})`);
+    
+    const response = await fetch(endpoint, {
       headers: {
         'accept': 'application/json'
       }
@@ -320,7 +335,7 @@ app.get('/api/transactions', async (req, res) => {
       throw new Error(`Blockscout API responded with ${response.status}: ${response.statusText}`);
     }
     
-    const data = await response.json();
+    const data: any = await response.json();
     console.log(`✅ Blockscout API proxy successful, got ${data.items ? data.items.length : 'unknown'} transactions`);
     
     // Extract the items array and limit to requested count
@@ -331,6 +346,92 @@ app.get('/api/transactions', async (req, res) => {
     }
     
     res.json(transactionData);
+  } catch (error: any) {
+    console.error('❌ Blockscout API proxy error:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to fetch transactions from Blockscout', 
+      details: error.message 
+    });
+  }
+});
+
+// Combined transactions endpoint - fetches both regular and internal transactions
+app.get('/api/blockscout-proxy', async (req, res) => {
+  try {
+    const limit = parseInt((req.query.limit as string) || '50');
+    const type = req.query.type || 'combined'; // 'internal', 'regular', or 'combined'
+    const chain = req.query.chain || 'ethereum';
+    
+    // Determine the base URL based on chain
+    let baseUrl = 'https://eth.blockscout.com/api/v2';
+    if (chain === 'katana') {
+      // For Katana, we'll use the working Ethereum endpoint as proxy
+      baseUrl = 'https://eth.blockscout.com/api/v2';
+    }
+    
+    console.log(`🗡️ Fetching ${type} transactions (limit: ${limit}, chain: ${chain})`);
+    
+    let allTransactions: any[] = [];
+    
+    if (type === 'internal' || type === 'combined') {
+      // Fetch internal transactions
+      const internalEndpoint = `${baseUrl}/internal-transactions`;
+      console.log(`🔄 Fetching internal transactions: ${internalEndpoint}`);
+      
+      const internalResponse = await fetch(internalEndpoint, {
+        headers: { 'accept': 'application/json' }
+      });
+      
+      if (internalResponse.ok) {
+        const internalData: any = await internalResponse.json();
+        const internalTxs = (internalData.items || []).map((tx: any) => ({
+          ...tx,
+          transaction_type: 'internal',
+          internal_transaction: true
+        }));
+        allTransactions.push(...internalTxs);
+        console.log(`✅ Fetched ${internalTxs.length} internal transactions`);
+      } else {
+        console.warn(`⚠️ Failed to fetch internal transactions: ${internalResponse.status}`);
+      }
+    }
+    
+    if (type === 'regular' || type === 'combined') {
+      // Fetch regular transactions
+      const regularEndpoint = `${baseUrl}/transactions`;
+      console.log(`🔄 Fetching regular transactions: ${regularEndpoint}`);
+      
+      const regularResponse = await fetch(regularEndpoint, {
+        headers: { 'accept': 'application/json' }
+      });
+      
+      if (regularResponse.ok) {
+        const regularData: any = await regularResponse.json();
+        const regularTxs = (regularData.items || []).map((tx: any) => ({
+          ...tx,
+          transaction_type: 'regular',
+          internal_transaction: false
+        }));
+        allTransactions.push(...regularTxs);
+        console.log(`✅ Fetched ${regularTxs.length} regular transactions`);
+      } else {
+        console.warn(`⚠️ Failed to fetch regular transactions: ${regularResponse.status}`);
+      }
+    }
+    
+    // Shuffle and limit the combined results for variety
+    const shuffledTransactions = allTransactions.sort(() => Math.random() - 0.5);
+    const limitedTransactions = shuffledTransactions.slice(0, limit);
+    
+    console.log(`🎲 Combined and shuffled ${allTransactions.length} total transactions, returning ${limitedTransactions.length}`);
+    
+    res.json({
+      items: limitedTransactions,
+      total_count: allTransactions.length,
+      returned_count: limitedTransactions.length,
+      transaction_types: type === 'combined' ? ['internal', 'regular'] : [type]
+    });
+    
   } catch (error: any) {
     console.error('❌ Blockscout API proxy error:', error.message);
     res.status(500).json({ 

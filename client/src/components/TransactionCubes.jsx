@@ -21,7 +21,7 @@ function TransactionCube({ character, position, speed, scale }) {
   useFrame((state, delta) => {
     if (meshRef.current) {
       // Move from right to left (slower speed)
-      meshRef.current.position.x -= speed * delta * 20
+      meshRef.current.position.x -= speed * delta * 10
       
       // Rotate the cube for visual interest (slower rotation)
       meshRef.current.rotation.x += delta * 0.2
@@ -61,7 +61,7 @@ function TransactionCubeScene({ characters }) {
       (Math.random() - 0.5) * 8, // Random Y position
       (Math.random() - 0.5) * 6   // Random Z position  
     ],
-    speed: 0.5 + Math.random() * 1.5, // Random speed between 0.5 and 2
+    speed: 0.3 + Math.random() * 0.8, // Random speed between 0.3 and 1.1
     scale: 0.5 + Math.random() * 0.5   // Random scale between 0.5 and 1
   }))
 

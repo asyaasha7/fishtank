@@ -16,6 +16,11 @@
   box-shadow: 0 4px 20px rgba(0, 255, 255, 0.1);
 }
 
+.flex {
+  display: flex;
+  gap: 10px;
+}
+
 .hud-section {
   margin-bottom: 16px;
 }

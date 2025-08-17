@@ -30,19 +30,17 @@ export class CDPClient {
   }
 
   private getAuthHeaders() {
-    const timestamp = Math.floor(Date.now() / 1000).toString();
-    // For CDP, we'll use API key authentication
+    // CDP uses CBPAY headers for authentication
     return {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${this.config.apiSecret}`,
-      'CB-ACCESS-KEY': this.config.apiKeyId,
-      'CB-ACCESS-TIMESTAMP': timestamp
+      'CBPAY-APP-ID': this.config.apiKeyId,
+      'CBPAY-API-KEY': this.config.apiSecret,
     };
   }
 
   async getTokenBalances(address: string, networkId: string = 'base'): Promise<BalanceResponse> {
     try {
-      const url = `${this.config.baseUrl}/platform/v1/addresses/${address}/balances?network_id=${networkId}`;
+      const url = `${this.config.baseUrl}/api/v1/addresses/${address}/balances?network_id=${networkId}`;
       
       const response = await fetch(url, {
         method: 'GET',

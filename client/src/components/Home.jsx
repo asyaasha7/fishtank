@@ -16,11 +16,11 @@ function transactionToCharacter(tx) {
   // Determine character type based on transaction characteristics and risk
   let characterType = "Standard Transaction"
   
-  // High-risk transactions become Toxic Predators (stricter criteria)
-  if (riskAnalysis.risk >= 70 || 
-      (tx.typeHints?.includes("Transfer") && tx.token?.notAllowlisted && riskAnalysis.risk >= 40) ||
-      (tx.token && !tx.token.verified && riskAnalysis.risk >= 40) ||
-      (tx.token?.contractAgeDays && tx.token.contractAgeDays < 3) ||
+  // High-risk transactions become Toxic Predators (much stricter criteria)
+  if (riskAnalysis.risk >= 80 || 
+      (tx.typeHints?.includes("Transfer") && tx.token?.notAllowlisted && riskAnalysis.risk >= 60) ||
+      (tx.token && !tx.token.verified && riskAnalysis.risk >= 60) ||
+      (tx.token?.contractAgeDays && tx.token.contractAgeDays < 1) ||
       tx.lists?.addressOnBlocklist ||
       tx.category === "Scam Token Transfer") {
     characterType = "Toxic Predator"
@@ -43,8 +43,8 @@ function transactionToCharacter(tx) {
            (tx.slippage && tx.slippage > 5)) {
     characterType = "Turbulent Current"
   }
-  // Medium risk transactions occasionally become Toxic Predators (reduced frequency)
-  else if (riskAnalysis.risk >= 45 && Math.random() < 0.15) {
+  // Medium risk transactions very rarely become Toxic Predators (much reduced frequency)
+  else if (riskAnalysis.risk >= 60 && Math.random() < 0.05) {
     characterType = "Toxic Predator"
     console.log('🦈 Creating Toxic Predator (medium risk):', tx.id, 'Risk:', riskAnalysis.risk)
   }

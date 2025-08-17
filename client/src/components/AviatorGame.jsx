@@ -148,37 +148,71 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
 
   useFrame((state, delta) => {
     if (meshRef.current && !isCollected) {
-      // Different movement speeds based on character type
+      const time = state.clock.getElapsedTime();
+      
+      // Create a unique phase offset for each character based on their ID
+      let hash = 0;
+      for (let i = 0; i < character.id.length; i++) {
+        hash = ((hash << 5) - hash + character.id.charCodeAt(i)) & 0xffffffff;
+      }
+      const uniqueOffset = Math.abs(hash % 1000) * 0.001;
+      
+      // Different movement patterns based on character type
       let movementSpeed = 15; // Default speed
+      let oscillationAmplitude = 1.2; // Default oscillation
+      let oscillationSpeed = 1.5; // Default wave speed
       
       if (character.name === "Toxic Predator") {
-        console.log("HERE WE ARE")
-        movementSpeed = 15; // Keep same speed as default for dangerous cubes
+        movementSpeed = 15; // Keep aggressive speed
+        oscillationAmplitude = 2.0; // More dramatic curves
+        oscillationSpeed = 2.5; // Faster, more menacing movement
         
-        // Add vertical oscillation to make Toxic Predators more menacing
-        const time = state.clock.getElapsedTime();
-        const oscillationAmplitude = 1.5; // How far up/down they move
-        const oscillationSpeed = 2.0; // How fast they oscillate
-        // Create a numeric hash from the character ID for unique offset
-        let hash = 0;
-        for (let i = 0; i < character.id.length; i++) {
-          hash = ((hash << 5) - hash + character.id.charCodeAt(i)) & 0xffffffff;
-        }
-        const uniqueOffset = Math.abs(hash % 1000) * 0.001; // Unique phase offset for each predator
-        
-        currentPosition.current[1] += Math.sin(time * oscillationSpeed + uniqueOffset) * oscillationAmplitude * delta;
-        
-        // Keep them within reasonable bounds
-        currentPosition.current[1] = Math.max(-4, Math.min(4, currentPosition.current[1]));
+        // Add sine wave movement with some aggression
+        const primaryWave = Math.sin(time * oscillationSpeed + uniqueOffset) * oscillationAmplitude;
+        const secondaryWave = Math.sin(time * oscillationSpeed * 1.7 + uniqueOffset + Math.PI/3) * (oscillationAmplitude * 0.3);
+        currentPosition.current[1] += (primaryWave + secondaryWave) * delta;
         
         // Make Toxic Predator swim close to the player's Z-axis for better collision
         if (sphereRef.current) {
-          currentPosition.current[2] = sphereRef.current.position.z; // Match player's Z position (2)
+          currentPosition.current[2] = sphereRef.current.position.z;
         }
+      } else if (character.name === "Treasure Jellyfish") {
+        movementSpeed = 10; // Moderate speed for collectibles
+        oscillationAmplitude = 1.8; // Graceful movement
+        oscillationSpeed = 1.2; // Slower, more elegant
+        
+        // Smooth, flowing movement like a jellyfish
+        const primaryWave = Math.sin(time * oscillationSpeed + uniqueOffset) * oscillationAmplitude;
+        const flowWave = Math.cos(time * oscillationSpeed * 0.8 + uniqueOffset) * (oscillationAmplitude * 0.5);
+        currentPosition.current[1] += (primaryWave + flowWave) * delta;
+      } else if (character.name === "Pufferfish Trap") {
+        movementSpeed = 6; // Slower, more predictable
+        oscillationAmplitude = 0.8; // Smaller movements
+        oscillationSpeed = 1.0; // Steady pace
+        
+        // Gentle bobbing motion
+        currentPosition.current[1] += Math.sin(time * oscillationSpeed + uniqueOffset) * oscillationAmplitude * delta;
+      } else if (character.name === "Turbulent Current") {
+        movementSpeed = 12; // Medium speed
+        oscillationAmplitude = 2.5; // Large, turbulent movements
+        oscillationSpeed = 3.0; // Fast, chaotic
+        
+        // Chaotic, turbulent movement
+        const turbulence1 = Math.sin(time * oscillationSpeed + uniqueOffset) * oscillationAmplitude;
+        const turbulence2 = Math.sin(time * oscillationSpeed * 1.3 + uniqueOffset + Math.PI/2) * (oscillationAmplitude * 0.6);
+        const turbulence3 = Math.sin(time * oscillationSpeed * 2.1 + uniqueOffset + Math.PI) * (oscillationAmplitude * 0.2);
+        currentPosition.current[1] += (turbulence1 + turbulence2 + turbulence3) * delta;
       } else {
-        // Make other cubes swim slower
-        movementSpeed = 8; // Slower speed for non-dangerous cubes
+        // Standard transaction - simple, gentle movement
+        movementSpeed = 8; // Slower speed for standard
+        oscillationAmplitude = 1.0; // Gentle curves
+        oscillationSpeed = 1.0; // Calm movement
+        
+        currentPosition.current[1] += Math.sin(time * oscillationSpeed + uniqueOffset) * oscillationAmplitude * delta;
       }
+      
+      // Keep all characters within reasonable bounds
+      currentPosition.current[1] = Math.max(-4, Math.min(4, currentPosition.current[1]));
       
       // Move from right to left - use independent position tracking
       currentPosition.current[0] -= speed * delta * movementSpeed

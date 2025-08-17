@@ -65,10 +65,10 @@ export const HUD: React.FC<ExtendedHUDProps> = ({
       )}
       {/* Game Info */}
       <div className="hud-section">
-        <div className="game-title">🌊 Fishtank: Liquidity Hunter</div>
+        {/* <div className="game-title">🌊 Fishtank: Liquidity Hunter</div>
         <div className="network-info">
           Game: {selectedChain === 'katana' ? 'Katana' : 'Ethereum'} · Payments: Base
-        </div>
+        </div> */}
         <div className="creature-count">📊 Active Creatures: {creatureCount}</div>
       </div>
 
@@ -117,9 +117,9 @@ export const HUD: React.FC<ExtendedHUDProps> = ({
             ) : (
               <div className="balance">💰 USDC (Base): $0.00</div>
             )}
-            {balances.error && (
+            {/* {balances.error && (
               <div className="error">⚠️ {balances.error}</div>
-            )}
+            )} */}
           </div>
         )}
       </div>
@@ -130,7 +130,9 @@ export const HUD: React.FC<ExtendedHUDProps> = ({
           
           {/* Current Heart Health Progress Bar */}
           <div className="heart-progress">
-            <div className="heart-progress-label">Current Heart Health: {health % 3 || 3}/3</div>
+            <div className='flex'>
+            <div className="heart-progress-label">Current Heart Health: {health % 3 || 3}/3</div>            <div className="heart-progress-info">🦈 3 hits from Toxic Predator = 1 life lost</div>
+            </div>
             <div className="heart-progress-bar">
               <div 
                 className="heart-progress-fill"
@@ -140,7 +142,6 @@ export const HUD: React.FC<ExtendedHUDProps> = ({
                 }}
               />
             </div>
-            <div className="heart-progress-info">🦈 3 hits from Toxic Predator = 1 life lost</div>
           </div>
         </div>
       </div>

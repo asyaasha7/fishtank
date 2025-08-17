@@ -30,7 +30,7 @@ A real-time 3D blockchain game where you play as a fish navigating through live 
 
 ### Real-time Balances
 - **Source**: CDP Token Balances API
-- **Update**: Every 30 seconds
+- **Update**: Every 30 
 - **Display**: USDC balance in HUD
 
 ## 🛠️ Tech Stack

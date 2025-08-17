@@ -77,7 +77,14 @@ function Home() {
   const wallet = useWallet()
 
   useEffect(() => {
-    loadTransactions(true) // Initial load
+    // Only start the game if wallet is connected
+    if (wallet.isConnected) {
+      loadTransactions(true) // Initial load
+    } else {
+      // Reset game state when wallet disconnects
+      setCharacters([])
+      setLoading(false)
+    }
     
     // Add mouse move listener for sphere control
     const handleMouseMove = (event) => {
@@ -138,7 +145,7 @@ function Home() {
       clearInterval(refreshInterval);
       clearInterval(countdownInterval);
     };
-  }, [selectedChain, isPaused]) // Reload when chain changes or pause state changes
+  }, [selectedChain, isPaused, wallet.isConnected]) // Reload when chain changes, pause state changes, or wallet connection changes
 
 
 
@@ -338,6 +345,88 @@ function Home() {
     }
   };
 
+  // Show wallet connection screen if not connected
+  if (!wallet.isConnected) {
+    return (
+      <div style={{ 
+        width: '100vw', 
+        height: '100vh', 
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        background: 'linear-gradient(135deg, #0a1428 0%, #1e3a5f 25%, #2c5aa0 50%, #1e3a5f 75%, #0a1428 100%)',
+        color: 'white',
+        textAlign: 'center'
+      }}>
+        <div style={{
+          background: 'rgba(0,0,0,0.8)',
+          padding: '3rem',
+          borderRadius: '20px',
+          border: '2px solid #a29bfe',
+          boxShadow: '0 20px 60px rgba(162, 155, 254, 0.3)',
+          maxWidth: '500px'
+        }}>
+          <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🗡️</div>
+          <h1 style={{ 
+            fontSize: '2.5rem', 
+            marginBottom: '1rem',
+            background: 'linear-gradient(45deg, #a29bfe, #74b9ff)',
+            backgroundClip: 'text',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent'
+          }}>
+            Katana Fishtank
+          </h1>
+          <p style={{ 
+            fontSize: '1.2rem', 
+            opacity: 0.8, 
+            marginBottom: '2rem',
+            lineHeight: '1.6'
+          }}>
+            Connect your wallet to dive into the blockchain gaming experience
+          </p>
+          <button
+            onClick={wallet.connect}
+            style={{
+              background: 'linear-gradient(135deg, #a29bfe 0%, #6c5ce7 100%)',
+              border: 'none',
+              padding: '1rem 2rem',
+              borderRadius: '12px',
+              color: 'white',
+              fontSize: '1.1rem',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 8px 25px rgba(162, 155, 254, 0.4)'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.transform = 'scale(1.05)'
+              e.target.style.boxShadow = '0 12px 35px rgba(162, 155, 254, 0.6)'
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.transform = 'scale(1)'
+              e.target.style.boxShadow = '0 8px 25px rgba(162, 155, 254, 0.4)'
+            }}
+          >
+            🔗 Connect Wallet to Start
+          </button>
+          <div style={{
+            marginTop: '2rem',
+            fontSize: '0.9rem',
+            opacity: 0.6,
+            borderTop: '1px solid rgba(255,255,255,0.2)',
+            paddingTop: '1rem'
+          }}>
+            <div>🎮 Real-time blockchain gaming</div>
+            <div>🏆 On-chain leaderboards</div>
+            <div>⚡ Live transaction analysis</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ 
       width: '100vw', 
@@ -346,66 +435,7 @@ function Home() {
       overflow: 'hidden',
       position: 'relative'
     }}>
-      <div style={{ 
-        position: 'absolute', 
-        top: '180px', 
-        gap: '20px',
-        left: '20px', 
-        width: '349px',
-        display: 'flex',
-        zIndex: 100,
-        background: 'rgba(0,0,0,0.7)',
-        padding: '10px',
-        borderRadius: '8px'
-      }}>
-        {loading && (
-          <div style={{ 
-            fontSize: '12px',
-            opacity: 0.7,
-            color: '#00ffff'
-          }}>
-            Loading transaction data...
-          </div>
-        )}
-        {!loading && (
-          <div style={{ 
-            fontSize: '12px',
-            opacity: 0.7,
-            color: '#00b894'
-          }}>
-            {characters.length} transactions loaded
-          </div>
-        )}
-        
-        {/* Auto-refresh status */}
-        <div style={{ 
-          fontSize: '11px',
-          opacity: 0.6,
-          color: isAutoRefreshing ? '#fdcb6e' : '#74b9ff',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
-        }}>
-          {isAutoRefreshing ? (
-            <>
-              <div style={{ 
-                width: '12px', 
-                height: '12px', 
-                border: '2px solid #fdcb6e',
-                borderTop: '2px solid transparent',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite'
-              }}></div>
-              Adding new cubes...
-            </>
-          ) : (
-            <>
-              <span style={{ color: '#74b9ff' }}>🔄</span>
-              Next batch in {refreshCountdown}s
-            </>
-          )}
-        </div>
-      </div>
+
       
       {/* Chain Switching Panel */}
       <div style={{ 
@@ -488,6 +518,10 @@ function Home() {
             setIsPaused={setIsPaused}
             recordRisk={recordRisk}
             onGameOver={onGameOver}
+            loading={loading}
+            isAutoRefreshing={isAutoRefreshing}
+            refreshCountdown={refreshCountdown}
+            charactersCount={characters ? characters.length : 0}
           />
         </div>
       )}

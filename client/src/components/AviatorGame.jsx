@@ -633,7 +633,11 @@ export default function FishtankGame({
   isPaused,
   setIsPaused,
   recordRisk,
-  onGameOver
+  onGameOver,
+  loading = false,
+  isAutoRefreshing = false,
+  refreshCountdown = 10,
+  charactersCount = 0
 }) {
   // Use props instead of local state for main game values
   const [score, setScore] = useState(gameScore || 0)
@@ -984,6 +988,88 @@ export default function FishtankGame({
           mixBlendMode: 'screen'
         }} />
       )}
+
+      {/* Data Refresh Information */}
+      <div className="data-refresh-info" style={{
+        position: 'absolute',
+        top: '70px',
+        left: '20px',
+        width: '350px',
+        background: 'rgba(0, 0, 0, 0.7)',
+        border: '1px solid rgba(255, 255, 255, 0.2)',
+        borderRadius: '8px',
+        padding: '0.75rem',
+        fontSize: '0.8rem',
+        color: '#e0e0e0'
+      }}>
+        <div style={{ 
+          color: '#74b9ff', 
+          fontWeight: 'bold', 
+          marginBottom: '0.5rem',
+          fontSize: '0.85rem'
+        }}>
+          📊 Data Status
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+          {loading && (
+            <div style={{ 
+              fontSize: '0.75rem',
+              opacity: 0.8,
+              color: '#00ffff',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <div style={{ 
+                width: '10px', 
+                height: '10px', 
+                border: '2px solid #00ffff',
+                borderTop: '2px solid transparent',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite'
+              }}></div>
+              Loading transaction data...
+            </div>
+          )}
+          {!loading && (
+            <div style={{ 
+              fontSize: '0.75rem',
+              opacity: 0.8,
+              color: '#00b894'
+            }}>
+              ✅ {charactersCount} transactions loaded
+            </div>
+          )}
+          
+          <div style={{ 
+            fontSize: '0.7rem',
+            opacity: 0.7,
+            color: isAutoRefreshing ? '#fdcb6e' : '#74b9ff',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            {isAutoRefreshing ? (
+              <>
+                <div style={{ 
+                  width: '8px', 
+                  height: '8px', 
+                  border: '1.5px solid #fdcb6e',
+                  borderTop: '1.5px solid transparent',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite'
+                }}></div>
+                Adding new cubes...
+              </>
+            ) : (
+              <>
+                <span style={{ color: '#74b9ff' }}>🔄</span>
+                Next batch in {refreshCountdown}s
+              </>
+            )}
+          </div>
+        </div>
+      </div>
       
          {/* Hotkeys Helper */}
       

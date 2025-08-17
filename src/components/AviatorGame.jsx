@@ -339,7 +339,6 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
 
 
 
-
 // Game cubes manager component
 function GameCubes({ characters, sphereRef, onCubeCollected, isShieldActive }) {
   const [cubeRegistry, setCubeRegistry] = useState(new Map())

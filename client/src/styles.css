@@ -1,0 +1,552 @@
+/* HUD Styles */
+.hud {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+  background: linear-gradient(135deg, rgba(0, 30, 60, 0.9) 0%, rgba(0, 20, 40, 0.95) 100%);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  border-radius: 12px;
+  padding: 24px;
+  color: white;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-size: 14px;
+  width: 543px;
+  box-shadow: 0 4px 20px rgba(0, 255, 255, 0.1);
+}
+
+.hud-section {
+  margin-bottom: 16px;
+}
+
+.hud-section:last-child {
+  margin-bottom: 0;
+}
+
+.recent-points {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  color: #00b894;
+  font-size: 18px;
+  font-weight: bold;
+  animation: fadeInOut 1.5s ease-out;
+  pointer-events: none;
+  z-index: 10;
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translateY(20px); }
+  30% { opacity: 1; transform: translateY(-10px); }
+  100% { opacity: 0; transform: translateY(-30px); }
+}
+
+.game-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #00ffff;
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.network-info {
+  font-size: 12px;
+  color: #a0a0a0;
+  text-align: center;
+}
+
+.creature-count {
+  font-size: 11px;
+  color: #00ffff;
+  text-align: center;
+  margin-top: 4px;
+}
+
+
+
+.game-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stat-label {
+  font-size: 12px;
+  font-weight: bold;
+  color: #a0a0a0;
+}
+
+.stat-value {
+  font-size: 14px;
+  font-weight: bold;
+  color: #00ffff;
+}
+
+.lives-display {
+  display: flex;
+  gap: 2px;
+}
+
+.life-heart {
+  font-size: 14px;
+}
+
+.health-lives {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.health-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.health-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.health-value {
+  font-size: 14px;
+  font-weight: bold;
+  color: #00ffff;
+}
+
+.heart-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.heart-progress-label {
+  font-size: 12px;
+  color: #a0a0a0;
+}
+
+.heart-progress-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.heart-progress-fill {
+  height: 100%;
+  transition: width 0.3s ease, background-color 0.3s ease;
+  border-radius: 4px;
+}
+
+.heart-progress-info {
+  font-size: 10px;
+  color: #a0a0a0;
+  opacity: 0.6;
+  text-align: center;
+}
+
+.shield-status {
+  background: rgba(0, 255, 255, 0.1);
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.shield-active {
+  font-size: 14px;
+  font-weight: bold;
+  color: #00ffff;
+  margin-bottom: 4px;
+}
+
+.shield-time {
+  font-size: 12px;
+  color: white;
+  margin-bottom: 4px;
+}
+
+.shield-info {
+  font-size: 10px;
+  color: #a0a0a0;
+}
+
+.shield-button {
+  background: linear-gradient(135deg, #00ffff, #0096ff);
+  border: none;
+  color: white;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  width: 100%;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+}
+
+.shield-button:disabled {
+  background: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.5);
+  cursor: not-allowed;
+}
+
+.shield-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0096ff, #00ffff);
+  box-shadow: 0 4px 16px rgba(0, 255, 255, 0.4);
+}
+
+.shield-description {
+  font-size: 10px;
+  color: #a0a0a0;
+  text-align: center;
+}
+
+.connect-button {
+  background: linear-gradient(135deg, #00b894, #00a085);
+  border: none;
+  color: white;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  width: 100%;
+  transition: all 0.3s ease;
+}
+
+.connect-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #00a085, #00b894);
+  box-shadow: 0 4px 16px rgba(0, 184, 148, 0.4);
+}
+
+.connect-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.wallet-info {
+  text-align: center;
+}
+
+.address {
+  font-size: 13px;
+  color: #00ffff;
+  margin-bottom: 4px;
+}
+
+.balance {
+  font-size: 12px;
+  color: #ffffff;
+}
+
+.usd-value {
+  color: #a0a0a0;
+  font-size: 11px;
+}
+
+.health-score {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.health, .score {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.label {
+  font-weight: bold;
+  min-width: 50px;
+}
+
+.hearts {
+  display: flex;
+  gap: 2px;
+}
+
+.heart {
+  font-size: 16px;
+}
+
+.health-text {
+  font-size: 12px;
+  color: #a0a0a0;
+}
+
+.score-value {
+  font-size: 16px;
+  font-weight: bold;
+  color: #00ffff;
+}
+
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.refill-button, .add-funds-button {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.refill-button {
+  background: linear-gradient(135deg, #74b9ff, #0984e3);
+  color: white;
+}
+
+.refill-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0984e3, #74b9ff);
+  box-shadow: 0 4px 16px rgba(116, 185, 255, 0.4);
+}
+
+.refill-button:disabled {
+  background: rgba(116, 185, 255, 0.3);
+  cursor: not-allowed;
+}
+
+.add-funds-button {
+  background: linear-gradient(135deg, #00b894, #00a085);
+  color: white;
+}
+
+.add-funds-button:hover {
+  background: linear-gradient(135deg, #00a085, #00b894);
+  box-shadow: 0 4px 16px rgba(0, 184, 148, 0.4);
+}
+
+.refill-info {
+  font-size: 11px;
+  color: #a0a0a0;
+  text-align: center;
+  margin-top: 8px;
+}
+
+.error {
+  color: #ff6b6b;
+  font-size: 12px;
+  text-align: center;
+  margin-top: 4px;
+}
+
+/* Payment Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.payment-modal {
+  background: rgba(0, 20, 40, 0.95);
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  border-radius: 16px;
+  padding: 24px;
+  color: white;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 16px 64px rgba(0, 255, 255, 0.3);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: #00ffff;
+  font-size: 20px;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  color: #a0a0a0;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.close-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.modal-content h4 {
+  color: #00ffff;
+  margin: 0 0 16px 0;
+  font-size: 18px;
+}
+
+.payment-info {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.info-row:last-child {
+  margin-bottom: 0;
+}
+
+.info-row .label {
+  font-weight: bold;
+  color: #a0a0a0;
+}
+
+.info-row .value {
+  color: white;
+  font-weight: bold;
+}
+
+.receiver {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.address {
+  font-family: monospace;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.copy-button {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.3s ease;
+}
+
+.copy-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.payment-instructions {
+  margin-bottom: 20px;
+}
+
+.payment-instructions h5 {
+  color: #00ffff;
+  margin: 0 0 12px 0;
+  font-size: 16px;
+}
+
+.payment-instructions ol {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.payment-instructions li {
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.demo-note {
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  color: #ffc107;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.demo-pay-button {
+  background: linear-gradient(135deg, #28a745, #20c997);
+  border: none;
+  color: white;
+  padding: 12px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.demo-pay-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #20c997, #28a745);
+  box-shadow: 0 4px 16px rgba(40, 167, 69, 0.4);
+}
+
+.demo-pay-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cancel-button {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 12px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.cancel-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}

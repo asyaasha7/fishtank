@@ -974,10 +974,89 @@ export default function FishtankGame({
         }} />
       )}
       
+         {/* Hotkeys Helper */}
+      
+        <div className="hotkeys-guide" style={{
+           position: 'absolute',
+           top: '163px',
+           left: '20px',
+           width: '350px',
+          background: 'rgba(0, 0, 0, 0.7)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          borderRadius: '8px',
+          padding: '0.75rem',
+          fontSize: '0.8rem',
+          color: '#e0e0e0'
+        }}>
+          <div style={{ 
+            color: '#74b9ff', 
+            fontWeight: 'bold', 
+            marginBottom: '0.5rem',
+            fontSize: '0.85rem'
+          }}>
+            🎮 Hotkeys
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#ddd' }}>Shield Purchase:</span>
+              <kbd style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '4px',
+                padding: '0.2rem 0.5rem',
+                fontSize: '0.75rem',
+                color: '#fff',
+                fontFamily: 'monospace'
+              }}>SPACE</kbd>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#ddd' }}>Pause/Resume:</span>
+              <div style={{ display: 'flex', gap: '0.3rem' }}>
+                <kbd style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  borderRadius: '4px',
+                  padding: '0.2rem 0.5rem',
+                  fontSize: '0.75rem',
+                  color: '#fff',
+                  fontFamily: 'monospace'
+                }}>P</kbd>
+                <span style={{ color: '#888', fontSize: '0.75rem' }}>or</span>
+                <kbd style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  borderRadius: '4px',
+                  padding: '0.2rem 0.5rem',
+                  fontSize: '0.75rem',
+                  color: '#fff',
+                  fontFamily: 'monospace'
+                }}>Z</kbd>
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#ddd' }}>Move Character:</span>
+              <span style={{
+                fontSize: '0.75rem',
+                color: '#a0a0a0',
+                fontStyle: 'italic'
+              }}>Mouse</span>
+            </div>
+          </div>
+          <div style={{ 
+            marginTop: '0.5rem', 
+            paddingTop: '0.5rem', 
+            borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+            fontSize: '0.7rem',
+            color: '#b0b0b0',
+            lineHeight: '1.3'
+          }}>
+          </div>
+        </div>
+   
       {/* Transaction Types Description Card */}
       <div style={{
         position: 'absolute',
-        top: '163px',
+        top: '310px',
         left: '20px',
         width: '348px',
         background: 'linear-gradient(135deg, rgba(0, 30, 60, 0.9) 0%, rgba(0, 20, 40, 0.95) 100%)',
@@ -1060,6 +1139,28 @@ export default function FishtankGame({
         
         <div style={{ marginBottom: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <span style={{ fontSize: '1.5rem', marginRight: '0.5rem' }}>🐚</span>
+            <strong style={{ color: '#40e0d0' }}>Treasure Jellyfish</strong>
+            <span style={{ 
+              marginLeft: '0.5rem', 
+              fontSize: '0.8rem', 
+              background: 'rgba(64, 224, 208, 0.2)', 
+              color: '#40e0d0', 
+              padding: '0.2rem 0.6rem', 
+              borderRadius: '12px',
+              fontWeight: 'bold',
+              border: '1px solid rgba(64, 224, 208, 0.3)'
+            }}>
+              {creatureCounts["Treasure Jellyfish"]}
+            </span>
+          </div>
+          <p style={{ margin: '0 0 0 2rem', fontSize: '0.8rem', opacity: 0.9 }}>
+            <span style={{ color: '#00b894', fontWeight: 'bold' }}>COLLECTIBLE!</span> Sandwich attacks and front-running patterns. Collect these luminous jellyfish for bonus points!
+          </p>
+        </div>
+
+        <div style={{ marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}>
                           <span style={{ fontSize: '1.5rem', marginRight: '0.5rem' }}>🐡</span>
               <strong style={{ color: '#fdcb6e' }}>Pufferfish Trap</strong>
               <span style={{ 
@@ -1101,28 +1202,7 @@ export default function FishtankGame({
             DEX swaps with extreme slippage (&gt;15%), creating dangerous turbulence in shallow pools or exotic coral reefs.
           </p>
         </div>
-        
-        <div style={{ marginBottom: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}>
-            <span style={{ fontSize: '1.5rem', marginRight: '0.5rem' }}>🐚</span>
-            <strong style={{ color: '#40e0d0' }}>Treasure Jellyfish</strong>
-            <span style={{ 
-              marginLeft: '0.5rem', 
-              fontSize: '0.8rem', 
-              background: 'rgba(64, 224, 208, 0.2)', 
-              color: '#40e0d0', 
-              padding: '0.2rem 0.6rem', 
-              borderRadius: '12px',
-              fontWeight: 'bold',
-              border: '1px solid rgba(64, 224, 208, 0.3)'
-            }}>
-              {creatureCounts["Treasure Jellyfish"]}
-            </span>
-          </div>
-          <p style={{ margin: '0 0 0 2rem', fontSize: '0.8rem', opacity: 0.9 }}>
-            <span style={{ color: '#00b894', fontWeight: 'bold' }}>COLLECTIBLE!</span> Sandwich attacks and front-running patterns. Collect these luminous jellyfish for bonus points!
-          </p>
-        </div>
+      
         
           <div style={{ 
             borderTop: '1px solid rgba(255,255,255,0.2)', 

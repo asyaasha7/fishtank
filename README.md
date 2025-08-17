@@ -17,7 +17,7 @@ A simple React starter app with Three.js support using React Three Fiber.
    npm install
    ```
 
-2. Start the development server:
+2. Start the development server
    ```bash
    npm run dev
    ```

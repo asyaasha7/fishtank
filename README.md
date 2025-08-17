@@ -16,10 +16,17 @@ A real-time 3D blockchain game where you play as a fish navigating through live 
 - **Benefit**: +3 Health Points
 - **Process**: 402 → Pay → Retry pattern
 
+
+2. Start the development server
+   ```bash
+   npm run dev
+   ```
+
 ### Onramp Integration
 - **Purpose**: Buy USDC on Base directly
 - **Provider**: Coinbase Pay
 - **Prefilled**: Your wallet address, USDC, Base network
+
 
 ### Real-time Balances
 - **Source**: CDP Token Balances API

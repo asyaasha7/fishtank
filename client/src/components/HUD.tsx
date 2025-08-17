@@ -1,6 +1,4 @@
 import React, { useState } from 'react';
-import { useWallet } from '../hooks/useWallet';
-import { useBalances } from '../hooks/useBalances';
 
 interface HUDProps {
   health: number;
@@ -40,11 +38,7 @@ export const HUD: React.FC<ExtendedHUDProps> = ({
   recentPoints,
   isPaused = false
 }) => {
-  const wallet = useWallet();
-  const balances = useBalances(wallet.address);
   const [isRefilling, setIsRefilling] = useState(false);
-
-  const usdcBalance = balances.getUSDCBalance();
   const hearts = Math.ceil(health / 8); // 8 HP per heart (8 hits from Toxic Predator = 1 life lost)
   const maxHearts = Math.ceil(maxHealth / 8); // Show 1 heart that represents 8 health points
 
@@ -113,37 +107,7 @@ export const HUD: React.FC<ExtendedHUDProps> = ({
         </div>
       </div>
 
-      {/* Wallet Section */}
-      <div className="hud-section">
-        {!wallet.isConnected ? (
-          <button 
-            onClick={wallet.connect} 
-            disabled={wallet.isConnecting}
-            className="connect-button"
-          >
-            {wallet.isConnecting ? 'Connecting...' : 'Connect Wallet'}
-          </button>
-        ) : (
-          <div className="wallet-info">
-            <div className="address">🔗 {wallet.formatAddress}</div>
-            {balances.isLoading ? (
-              <div className="balance">Loading balances...</div>
-            ) : usdcBalance ? (
-              <div className="balance">
-                💰 USDC (Base): ${parseFloat(usdcBalance.value).toFixed(2)}
-                {usdcBalance.valueUSD !== parseFloat(usdcBalance.value) && (
-                  <span className="usd-value"> (${usdcBalance.valueUSD.toFixed(2)})</span>
-                )}
-              </div>
-            ) : (
-              <div className="balance">💰 USDC (Base): $0.00</div>
-            )}
-            {/* {balances.error && (
-              <div className="error">⚠️ {balances.error}</div>
-            )} */}
-          </div>
-        )}
-      </div>
+
 
       {/* Health & Lives Progress */}
       <div className="hud-section">
@@ -200,114 +164,31 @@ export const HUD: React.FC<ExtendedHUDProps> = ({
       </div>
 
       {/* Action Buttons */}
-      {wallet.isConnected && (
-        <div className="hud-section">
-          <div className="action-buttons">
-            <button 
-              onClick={handleRefill}
-              disabled={isRefilling || health >= maxHealth}
-              className="refill-button"
-              title="Pay $0.01 USDC to refill health (+3 HP)"
-            >
-              {isRefilling ? '⏳ Refilling...' : '💊 Refill Health (+3 HP)'}
-            </button>
-            <button 
-              onClick={onAddFunds}
-              className="add-funds-button"
-              title="Buy USDC on Base to pay for refills"
-            >
-              💳 Add Funds
-            </button>
-          </div>
-          <div className="refill-info">
-            💊 Health refill costs $0.01 USDC on Base
-          </div>
-        </div>
-      )}
-
-      {/* Hotkeys Helper */}
       <div className="hud-section">
-        <div className="hotkeys-guide" style={{
-          background: 'rgba(0, 0, 0, 0.7)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          borderRadius: '8px',
-          padding: '0.75rem',
-          fontSize: '0.8rem',
-          color: '#e0e0e0'
-        }}>
-          <div style={{ 
-            color: '#74b9ff', 
-            fontWeight: 'bold', 
-            marginBottom: '0.5rem',
-            fontSize: '0.85rem'
-          }}>
-            🎮 Hotkeys
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ color: '#ddd' }}>Shield Purchase:</span>
-              <kbd style={{
-                background: 'rgba(255, 255, 255, 0.1)',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                borderRadius: '4px',
-                padding: '0.2rem 0.5rem',
-                fontSize: '0.75rem',
-                color: '#fff',
-                fontFamily: 'monospace'
-              }}>SPACE</kbd>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ color: '#ddd' }}>Pause/Resume:</span>
-              <div style={{ display: 'flex', gap: '0.3rem' }}>
-                <kbd style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  borderRadius: '4px',
-                  padding: '0.2rem 0.5rem',
-                  fontSize: '0.75rem',
-                  color: '#fff',
-                  fontFamily: 'monospace'
-                }}>P</kbd>
-                <span style={{ color: '#888', fontSize: '0.75rem' }}>or</span>
-                <kbd style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  borderRadius: '4px',
-                  padding: '0.2rem 0.5rem',
-                  fontSize: '0.75rem',
-                  color: '#fff',
-                  fontFamily: 'monospace'
-                }}>Z</kbd>
-              </div>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ color: '#ddd' }}>Move Character:</span>
-              <span style={{
-                fontSize: '0.75rem',
-                color: '#a0a0a0',
-                fontStyle: 'italic'
-              }}>Mouse</span>
-            </div>
-          </div>
-          <div style={{ 
-            marginTop: '0.5rem', 
-            paddingTop: '0.5rem', 
-            borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-            fontSize: '0.7rem',
-            color: '#b0b0b0',
-            lineHeight: '1.3'
-          }}>
-            💡 <strong style={{ color: '#40e0d0' }}>Tips:</strong> Collect cyan jellyfish for points, avoid red predators, shield costs 100pts
-          </div>
+        <div className="action-buttons flex">
+          <button 
+            onClick={handleRefill}
+            disabled={isRefilling || health >= maxHealth}
+            className="refill-button"
+            title="Pay $0.01 USDC to refill health (+3 HP)"
+          >
+            {isRefilling ? '⏳ Refilling...' : '💊 Refill Health (+3 HP)'}
+          </button>
+          <button 
+            onClick={onAddFunds}
+            className="add-funds-button"
+            title="Buy USDC on Base to pay for refills"
+          >
+            💳 Add Funds
+          </button>
+        </div>
+        <div className="refill-info">
+          💊 Health refill costs $0.01 USDC on Base
         </div>
       </div>
 
-      {/* Wallet Error */}
-      {wallet.error && (
-        <div className="hud-section">
-          <div className="error">⚠️ {wallet.error}</div>
-        </div>
-      )}
+
+
     </div>
   );
 };

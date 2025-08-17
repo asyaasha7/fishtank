@@ -1,8 +1,13 @@
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { useWallet } from '../hooks/useWallet'
+import { useBalances } from '../hooks/useBalances'
 
 function Navigation() {
   const location = useLocation()
+  const wallet = useWallet()
+  const balances = useBalances(wallet.address)
+  const usdcBalance = balances.getUSDCBalance()
 
   const navStyle = {
     position: 'fixed',
@@ -57,6 +62,45 @@ function Navigation() {
     boxShadow: '0 0 15px rgba(0, 255, 255, 0.3)'
   }
 
+  const walletSectionStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '1rem',
+    marginLeft: '2rem'
+  }
+
+  const connectButtonStyle = {
+    background: 'linear-gradient(135deg, #00b894 0%, #00a085 100%)',
+    border: 'none',
+    borderRadius: '8px',
+    padding: '0.5rem 1rem',
+    color: 'white',
+    cursor: 'pointer',
+    fontSize: '0.9rem',
+    fontWeight: '500',
+    transition: 'all 0.3s ease',
+    boxShadow: '0 2px 10px rgba(0, 184, 148, 0.3)'
+  }
+
+  const walletInfoStyle = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.25rem',
+    fontSize: '0.8rem',
+    color: '#e0e0e0'
+  }
+
+  const addressStyle = {
+    color: '#00ffff',
+    fontFamily: 'monospace',
+    fontSize: '0.75rem'
+  }
+
+  const balanceStyle = {
+    color: '#40e0d0',
+    fontWeight: '500'
+  }
+
   return (
     <nav style={navStyle}>
       <div style={navContainerStyle}>
@@ -64,68 +108,111 @@ function Navigation() {
           🌊 Fishtank: Liquidity Hunter
         </Link>
         
-        <ul style={navLinksStyle}>
-          <li>
-            <Link 
-              to="/" 
-              style={location.pathname === '/' ? activeLinkStyle : linkStyle}
-              onMouseEnter={(e) => {
-                if (location.pathname !== '/') {
-                  e.target.style.background = 'rgba(0, 255, 255, 0.1)'
-                  e.target.style.boxShadow = '0 0 10px rgba(0, 255, 255, 0.2)'
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (location.pathname !== '/') {
-                  e.target.style.background = 'transparent'
-                  e.target.style.boxShadow = 'none'
-                }
-              }}
-            >
-              Play
-            </Link>
-          </li>
-          <li>
-            <Link 
-              to="/explore" 
-              style={location.pathname === '/explore' ? activeLinkStyle : linkStyle}
-              onMouseEnter={(e) => {
-                if (location.pathname !== '/explore') {
-                  e.target.style.background = 'rgba(0, 255, 255, 0.1)'
-                  e.target.style.boxShadow = '0 0 10px rgba(0, 255, 255, 0.2)'
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (location.pathname !== '/explore') {
-                  e.target.style.background = 'transparent'
-                  e.target.style.boxShadow = 'none'
-                }
-              }}
-            >
-              Explore
-            </Link>
-          </li>
-          <li>
-            <Link 
-              to="/profile" 
-              style={location.pathname === '/profile' ? activeLinkStyle : linkStyle}
-              onMouseEnter={(e) => {
-                if (location.pathname !== '/profile') {
-                  e.target.style.background = 'rgba(0, 255, 255, 0.1)'
-                  e.target.style.boxShadow = '0 0 10px rgba(0, 255, 255, 0.2)'
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (location.pathname !== '/profile') {
-                  e.target.style.background = 'transparent'
-                  e.target.style.boxShadow = 'none'
-                }
-              }}
-            >
-              Profile
-            </Link>
-          </li>
-        </ul>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <ul style={navLinksStyle}>
+            <li>
+              <Link 
+                to="/" 
+                style={location.pathname === '/' ? activeLinkStyle : linkStyle}
+                onMouseEnter={(e) => {
+                  if (location.pathname !== '/') {
+                    e.target.style.background = 'rgba(0, 255, 255, 0.1)'
+                    e.target.style.boxShadow = '0 0 10px rgba(0, 255, 255, 0.2)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (location.pathname !== '/') {
+                    e.target.style.background = 'transparent'
+                    e.target.style.boxShadow = 'none'
+                  }
+                }}
+              >
+                Play
+              </Link>
+            </li>
+            <li>
+              <Link 
+                to="/explore" 
+                style={location.pathname === '/explore' ? activeLinkStyle : linkStyle}
+                onMouseEnter={(e) => {
+                  if (location.pathname !== '/explore') {
+                    e.target.style.background = 'rgba(0, 255, 255, 0.1)'
+                    e.target.style.boxShadow = '0 0 10px rgba(0, 255, 255, 0.2)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (location.pathname !== '/explore') {
+                    e.target.style.background = 'transparent'
+                    e.target.style.boxShadow = 'none'
+                  }
+                }}
+              >
+                Explore
+              </Link>
+            </li>
+            <li>
+              <Link 
+                to="/profile" 
+                style={location.pathname === '/profile' ? activeLinkStyle : linkStyle}
+                onMouseEnter={(e) => {
+                  if (location.pathname !== '/profile') {
+                    e.target.style.background = 'rgba(0, 255, 255, 0.1)'
+                    e.target.style.boxShadow = '0 0 10px rgba(0, 255, 255, 0.2)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (location.pathname !== '/profile') {
+                    e.target.style.background = 'transparent'
+                    e.target.style.boxShadow = 'none'
+                  }
+                }}
+              >
+                Profile
+              </Link>
+            </li>
+          </ul>
+
+          {/* Wallet Section */}
+          <div style={walletSectionStyle}>
+            {!wallet.isConnected ? (
+              <button 
+                onClick={wallet.connect} 
+                disabled={wallet.isConnecting}
+                style={connectButtonStyle}
+                onMouseEnter={(e) => {
+                  if (!wallet.isConnecting) {
+                    e.target.style.transform = 'translateY(-1px)'
+                    e.target.style.boxShadow = '0 4px 15px rgba(0, 184, 148, 0.4)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = 'translateY(0)'
+                  e.target.style.boxShadow = '0 2px 10px rgba(0, 184, 148, 0.3)'
+                }}
+              >
+                {wallet.isConnecting ? 'Connecting...' : 'Connect Wallet'}
+              </button>
+            ) : (
+              <div style={walletInfoStyle}>
+                <div style={addressStyle}>🔗 {wallet.formatAddress}</div>
+                {balances.isLoading ? (
+                  <div style={balanceStyle}>Loading...</div>
+                ) : usdcBalance ? (
+                  <div style={balanceStyle}>
+                    💰 ${parseFloat(usdcBalance.value).toFixed(2)} USDC
+                  </div>
+                ) : (
+                  <div style={balanceStyle}>💰 $0.00 USDC</div>
+                )}
+              </div>
+            )}
+            {wallet.error && (
+              <div style={{ color: '#ff6b6b', fontSize: '0.75rem' }}>
+                ⚠️ {wallet.error}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </nav>
   )

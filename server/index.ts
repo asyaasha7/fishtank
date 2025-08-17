@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { ethers, keccak256, toUtf8Bytes } from 'ethers';
 import FishtankGameStateABI from './abi/FishtankGameState.json';
+import { createCDPClient } from './cdp';
 
 // Load environment variables
 dotenv.config({ path: '../.env' });
@@ -83,6 +84,8 @@ console.log('✍️ Signer:', signerWallet.address);
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+
 
 // Get player state (read-only)
 app.get('/api/fishtank/player/:addr', async (req, res) => {
@@ -239,77 +242,163 @@ app.post('/api/fishtank/event/health', async (req, res) => {
   }
 });
 
-// Submit score using simplified contract method (players call directly)
+// DEPRECATED: Score submission now happens directly from user wallet
+// This endpoint is kept for backwards compatibility but should not be used
 app.post('/api/fishtank/score/submit', async (req, res) => {
+  res.status(400).json({ 
+    error: 'Score submission has moved to client-side. Please update your game client.',
+    message: 'Scores should now be submitted directly from the user wallet to the smart contract.'
+  });
+  return;
+
+  // [Removed deprecated server-side submission code - now handled client-side]
+});
+
+// Coinbase CDP integration endpoints
+
+// Get token balances
+app.get('/api/balances', async (req, res) => {
   try {
-    const { player, score } = req.body;
-
-    if (!ethers.isAddress(player)) {
-      return res.status(400).json({ error: 'Invalid player address' });
-    }
-
-    if (typeof score !== 'number' || score < 0) {
-      return res.status(400).json({ error: 'Invalid score' });
-    }
-
-    console.log(`🏆 Submitting score: ${player}, score: ${score}`);
-
-    // Create timestamps
-    const now = Math.floor(Date.now() / 1000);
-    const startedAt = now - 60; // Assume game started 1 minute ago
-    const endedAt = now;
-
-    // Generate unique runId based on player and timestamp
-    const runId = keccak256(toUtf8Bytes(`run:${player}:${Date.now()}`));
-    console.log(`🎮 Run ID: ${runId}`);
-
-    // Submit score directly to the contract using the reporterWallet
-    // Note: In production, players would call this directly from their wallets
-    const gasLimit = 200000; // Gas limit for the simple submitScore call
-    const tx = await fishtankContract.submitScore(
-      BigInt(score),
-      runId,
-      BigInt(startedAt),
-      BigInt(endedAt),
-      { gasLimit: gasLimit }
-    );
-    console.log(`📡 Transaction sent: ${tx.hash}`);
+    const { address } = req.query;
     
-    const receipt = await tx.wait();
-    console.log(`✅ Transaction confirmed: ${receipt.hash} (block: ${receipt.blockNumber})`);
+    if (!address) {
+      return res.status(400).json({ error: 'Address parameter is required' });
+    }
+    
+    const addressStr = address as string;
+    
+    // More lenient address validation - check format and length
+    if (!addressStr.match(/^0x[a-fA-F0-9]{40}$/)) {
+      return res.status(400).json({ error: 'Valid address parameter is required' });
+    }
+    
+    // Normalize address to checksum format for consistency
+    const normalizedAddress = ethers.getAddress(addressStr.toLowerCase());
 
+    // Check if CDP credentials are available
+    const cdpKeyId = process.env.CDP_API_KEY_ID;
+    const cdpSecret = process.env.CDP_API_SECRET;
+    
+    if (!cdpKeyId || !cdpSecret) {
+      console.log('CDP credentials not found, returning mock data');
+      // Return mock data when CDP is not configured
+      return res.json({
+        balances: [
+          {
+            symbol: 'USDC',
+            network: 'base',
+            value: '25.50',
+            valueUSD: 25.50,
+            contractAddress: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'
+          },
+          {
+            symbol: 'ETH',
+            network: 'base',
+            value: '0.0123',
+            valueUSD: 40.25
+          }
+        ]
+      });
+    }
+
+    const cdpClient = createCDPClient(cdpKeyId, cdpSecret);
+    const balances = await cdpClient.getTokenBalances(normalizedAddress, 'base');
+    
+    res.json(balances);
+  } catch (error: any) {
+    console.error('Error fetching balances:', error?.message || error);
+    res.status(500).json({ error: 'Failed to fetch balances' });
+  }
+});
+
+// Get Coinbase onramp URL
+app.get('/api/onramp-url', async (req, res) => {
+  try {
+    const { address } = req.query;
+    console.log('📍 Onramp request received:', { address, query: req.query });
+    
+    if (!address) {
+      console.log('❌ No address provided');
+      return res.status(400).json({ error: 'Address parameter is required' });
+    }
+    
+    const addressStr = address as string;
+    
+    // More lenient address validation - check format and length
+    if (!addressStr.match(/^0x[a-fA-F0-9]{40}$/)) {
+      console.log('❌ Invalid address format:', addressStr);
+      return res.status(400).json({ error: 'Valid address parameter is required' });
+    }
+    
+    // Normalize address to checksum format for consistency
+    const normalizedAddress = ethers.getAddress(addressStr.toLowerCase());
+    console.log('✅ Normalized address:', normalizedAddress);
+
+    const projectId = process.env.COINBASE_PROJECT_ID || 'fishtank-liquidity-hunter';
+    
+    // Build Coinbase Pay URL with prefilled parameters
+    const onrampUrl = new URL('https://pay.coinbase.com/buy/select-asset');
+    onrampUrl.searchParams.set('appId', projectId);
+    onrampUrl.searchParams.set('destinationWallet', normalizedAddress);
+    onrampUrl.searchParams.set('assets', 'USDC');
+    onrampUrl.searchParams.set('networks', 'base');
+    onrampUrl.searchParams.set('defaultAsset', 'USDC');
+    onrampUrl.searchParams.set('defaultNetwork', 'base');
+    onrampUrl.searchParams.set('defaultPaymentMethod', 'ACH_BANK_ACCOUNT,DEBIT_CARD');
+
+    console.log(`🏦 Generated onramp URL for ${normalizedAddress}`);
+    
     res.json({
-      success: true,
-      txHash: receipt.hash,
-      blockNumber: receipt.blockNumber,
-      runId: runId,
-      score: score,
-      startedAt: startedAt,
-      endedAt: endedAt
+      url: onrampUrl.toString(),
+      message: 'Open this URL to buy USDC on Base'
     });
   } catch (error: any) {
-    console.error('💥 Error submitting score:', error);
-    
-    // Provide more specific error messages for the simplified contract
-    let errorMessage = 'Failed to submit score';
-    if (error?.message?.includes('score>max')) {
-      errorMessage = 'Score exceeds maximum allowed value';
-    } else if (error?.message?.includes('bad time')) {
-      errorMessage = 'Invalid game time range';
-    } else if (error?.message?.includes('runId used')) {
-      errorMessage = 'This run ID has already been used';
-    } else if (error?.message?.includes('cooldown')) {
-      errorMessage = 'Player is still in cooldown period';
-    } else if (error?.message?.includes('paused')) {
-      errorMessage = 'Contract is currently paused';
-    } else if (error?.message?.includes('insufficient funds')) {
-      errorMessage = 'Insufficient funds for transaction';
+    console.error('Error generating onramp URL:', error?.message || error);
+    res.status(500).json({ error: 'Failed to generate onramp URL' });
+  }
+});
+
+// Health refill with x402 pattern
+app.post('/api/refill', async (req, res) => {
+  try {
+    const currentHealth = parseInt(req.headers['x-current-health'] as string);
+    const playerAddress = req.headers['x-player-address'] as string;
+    const paymentProof = req.headers['x-payment'] as string;
+
+    if (!playerAddress || !ethers.isAddress(playerAddress)) {
+      return res.status(400).json({ error: 'Valid X-Player-Address header is required' });
     }
+
+    if (isNaN(currentHealth) || currentHealth < 0) {
+      return res.status(400).json({ error: 'Valid X-Current-Health header is required' });
+    }
+
+    // If no payment proof, return 402 Payment Required
+    if (!paymentProof) {
+      return res.status(402).json({
+        payment: {
+          price: '0.01',
+          currency: 'USDC',
+          network: 'base',
+          receiver: process.env.REFILL_RECEIVER || '0x742a4a9F23E8C14e8C20320E6e0B3E9e2DF5A5F8',
+          message: 'Pay 0.01 USDC on Base to refill health (+3 HP)'
+        }
+      });
+    }
+
+    // Verify payment (simplified for demo)
+    console.log(`💊 Health refill requested by ${playerAddress} (current: ${currentHealth}HP, proof: ${paymentProof})`);
     
-    res.status(500).json({ 
-      error: errorMessage,
-      details: error?.message || error 
+    const newHealth = Math.min(currentHealth + 3, 9); // Cap at 9 HP
+    
+    res.json({
+      ok: true,
+      newHealth,
+      message: `Health refilled to ${newHealth} HP`
     });
+  } catch (error: any) {
+    console.error('Error processing refill:', error?.message || error);
+    res.status(500).json({ error: 'Failed to process health refill' });
   }
 });
 

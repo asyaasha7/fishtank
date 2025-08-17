@@ -10,6 +10,7 @@ let gameState = {
   health: 8, // Current health progress (8 = full heart, 0 = damaged heart)
   maxHealth: 8, // Max health per heart (8 hits from Toxic Predator = 1 life lost)
   isGameOver: false,
+  finalScore: 0, // Store final score before reset
   cubes: [],
   particleEffects: [],
   damageEffects: []
@@ -35,9 +36,9 @@ function takeDamage(amount = 1) {
     if (gameState.lives <= 0) {
       console.log('💀 Game Over! Final Score:', gameState.score)
       gameState.isGameOver = true
-      // Reset score immediately when game over occurs
-      gameState.score = 0
-      console.log('🔄 Score reset to 0 after game over')
+      // Store final score but don't reset it yet - will be reset when new game starts
+      gameState.finalScore = gameState.score
+      console.log('🏆 Final score stored:', gameState.finalScore)
     }
   }
 }
@@ -47,8 +48,9 @@ function resetGame() {
   gameState.lives = 3
   gameState.health = gameState.maxHealth
   gameState.score = 0
+  gameState.finalScore = 0
   gameState.isGameOver = false
-  console.log('🎮 Game restarted!')
+  console.log('🎮 Game restarted! Score reset to 0.')
 }
 
 // Normalize function from tutorial
@@ -527,9 +529,9 @@ function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealth
         }
         if (gameState.lives <= 0) {
           gameState.isGameOver = true;
-          // Reset score immediately when game over occurs
-          gameState.score = 0;
-          console.log('🔄 Score reset to 0 after game over (Pufferfish)');
+          // Store final score but don't reset it yet - will be reset when new game starts
+          gameState.finalScore = gameState.score;
+          console.log('🏆 Final score stored (Pufferfish):', gameState.finalScore);
         }
         
         // Update UI without damage flash
@@ -629,7 +631,9 @@ export default function FishtankGame({
   shieldTimeLeft,
   setShieldTimeLeft,
   isPaused,
-  setIsPaused
+  setIsPaused,
+  recordRisk,
+  onGameOver
 }) {
   // Use props instead of local state for main game values
   const [score, setScore] = useState(gameScore || 0)
@@ -722,11 +726,11 @@ export default function FishtankGame({
     // Check for game over
     if (gameState.isGameOver) {
       setIsGameOver(true)
-      // Reset score to 0 when game over is detected
-      if (gameState.score === 0) {
-        setScore(0)
-        setGameScore(0)
-        console.log('🔄 UI score reset to 0 after game over')
+      // Keep the final score displayed until restart - don't reset to 0 yet
+      if (gameState.finalScore > 0) {
+        console.log('🏆 Game over - showing final score:', gameState.finalScore)
+        setScore(gameState.finalScore)
+        setGameScore(gameState.finalScore)
       }
     }
     
@@ -742,11 +746,11 @@ export default function FishtankGame({
     // Check for game over without damage flash
     if (gameState.isGameOver) {
       setIsGameOver(true)
-      // Reset score to 0 when game over is detected
-      if (gameState.score === 0) {
-        setScore(0)
-        setGameScore(0)
-        console.log('🔄 UI score reset to 0 after game over (no flash)')
+      // Keep the final score displayed until restart - don't reset to 0 yet
+      if (gameState.finalScore > 0) {
+        console.log('🏆 Game over (no flash) - showing final score:', gameState.finalScore)
+        setScore(gameState.finalScore)
+        setGameScore(gameState.finalScore)
       }
     }
   }
@@ -776,7 +780,14 @@ export default function FishtankGame({
   useEffect(() => {
     const checkGameOver = () => {
       if (gameState.isGameOver && !isGameOver) {
+        // Use the stored final score instead of current score
+        const finalScore = gameState.finalScore || score
+        console.log('🎮 Game over detected - calling onGameOver with final score:', finalScore)
         setIsGameOver(true)
+        // Call the blockchain score submission with final score
+        if (onGameOver) {
+          onGameOver(finalScore, health, lives)
+        }
       }
     }
     
@@ -784,7 +795,7 @@ export default function FishtankGame({
     const interval = setInterval(checkGameOver, 100)
     
     return () => clearInterval(interval)
-  }, [isGameOver])
+  }, [isGameOver, onGameOver, score, health, lives])
 
   if (!characters || characters.length === 0) {
     return null

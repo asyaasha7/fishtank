@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react'
+import { useWallet } from '../hooks/useWallet'
+import { useLeaderboard, useFishtankData } from '../hooks/useFishtank'
 
 // Mock user data - in a real app this would come from authentication/database
 const mockUserData = {
@@ -40,12 +42,17 @@ const mockLeaderboard = [
 
 function Profile() {
   const [activeTab, setActiveTab] = useState('profile')
-  const [leaderboardFilter, setLeaderboardFilter] = useState('all')
   const [userData] = useState(mockUserData)
+  
+  // Blockchain data
+  const wallet = useWallet()
+  const { leaderboard, loading: leaderboardLoading, error: leaderboardError } = useLeaderboard(20)
+  const { data: fishtankData, loading: profileLoading } = useFishtankData(wallet.address || null)
 
-  const filteredLeaderboard = leaderboardFilter === 'all' 
-    ? mockLeaderboard 
-    : mockLeaderboard.filter(player => player.chain === leaderboardFilter)
+  // Use real leaderboard data if available, fallback to Katana mock data only
+  const realLeaderboard = leaderboard?.leaderboard || []
+  const katanaMockData = mockLeaderboard.filter(player => player.chain === 'katana')
+  const filteredLeaderboard = realLeaderboard.length > 0 ? realLeaderboard : katanaMockData
 
   const TabButton = ({ id, label, icon, isActive, onClick }) => (
     <button
@@ -124,50 +131,66 @@ function Profile() {
     </div>
   )
 
-  const LeaderboardRow = ({ player, isCurrentUser = false }) => (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      padding: '1rem',
-      background: isCurrentUser ? 'rgba(116,185,255,0.2)' : 'rgba(255,255,255,0.05)',
-      borderRadius: '8px',
-      border: isCurrentUser ? '2px solid #74b9ff' : '1px solid rgba(255,255,255,0.1)',
-      marginBottom: '0.5rem'
-    }}>
-      <div style={{ 
-        minWidth: '60px', 
-        fontSize: '1.5rem', 
-        fontWeight: 'bold',
-        color: player.rank <= 3 ? '#fdcb6e' : '#74b9ff'
+  const LeaderboardRow = ({ player, isCurrentUser = false }) => {
+    // Handle both mock data format and real blockchain data format
+    const isRealData = player.address !== undefined
+    const displayAddress = isRealData ? player.displayAddress : player.username
+    const avatar = isRealData ? '🎮' : player.avatar
+    const chain = isRealData ? 'katana' : player.chain
+    
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: '1rem',
+        background: isCurrentUser ? 'rgba(116,185,255,0.2)' : 'rgba(255,255,255,0.05)',
+        borderRadius: '8px',
+        border: isCurrentUser ? '2px solid #74b9ff' : '1px solid rgba(255,255,255,0.1)',
+        marginBottom: '0.5rem'
       }}>
-        #{player.rank}
-      </div>
-      <div style={{ fontSize: '2rem', marginRight: '1rem' }}>{player.avatar}</div>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: 'bold', marginBottom: '0.2rem' }}>
-          {player.username}
-          {isCurrentUser && <span style={{ color: '#74b9ff', marginLeft: '0.5rem' }}>(You)</span>}
+        <div style={{ 
+          minWidth: '60px', 
+          fontSize: '1.2rem', 
+          fontWeight: 'bold',
+          color: player.rank <= 3 ? '#fdcb6e' : '#74b9ff'
+        }}>
+          {player.rank === 1 && '🥇'}
+          {player.rank === 2 && '🥈'}
+          {player.rank === 3 && '🥉'}
+          {player.rank > 3 && `#${player.rank}`}
+        </div>
+        <div style={{ fontSize: '2rem', marginRight: '1rem' }}>{avatar}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 'bold', marginBottom: '0.2rem', fontFamily: isRealData ? 'Monaco, monospace' : 'inherit' }}>
+            {displayAddress}
+            {isCurrentUser && <span style={{ color: '#74b9ff', marginLeft: '0.5rem' }}>(You)</span>}
+          </div>
+          <div style={{ 
+            fontSize: '0.8rem', 
+            opacity: 0.7,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            <span>🗡️</span>
+            Katana
+            {isRealData && (
+              <span style={{ marginLeft: '0.5rem', color: '#00b894' }}>
+                📡 Live Data
+              </span>
+            )}
+          </div>
         </div>
         <div style={{ 
-          fontSize: '0.8rem', 
-          opacity: 0.7,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
+          fontSize: '1.5rem', 
+          fontWeight: 'bold', 
+          color: '#fdcb6e' 
         }}>
-          <span>{player.chain === 'ethereum' ? '⟠' : '🗡️'}</span>
-          {player.chain === 'ethereum' ? 'Ethereum' : 'Katana'}
+          {player.score.toLocaleString()}
         </div>
       </div>
-      <div style={{ 
-        fontSize: '1.5rem', 
-        fontWeight: 'bold', 
-        color: '#fdcb6e' 
-      }}>
-        {player.score.toLocaleString()}
-      </div>
-    </div>
-  )
+    )
+  }
 
   return (
     <div style={{
@@ -249,14 +272,36 @@ function Profile() {
                 </div>
                 <div>
                   <h2 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>
-                    {userData.username}
+                    {wallet.isConnected && wallet.address ? (wallet.address.slice(0, 6) + '...' + wallet.address.slice(-4)) : userData.username}
                   </h2>
-                  <div style={{ fontSize: '1rem', opacity: 0.7, marginBottom: '0.5rem' }}>
-                    {userData.address}
+                  <div style={{ fontSize: '1rem', opacity: 0.7, marginBottom: '0.5rem', fontFamily: wallet.isConnected ? 'Monaco, monospace' : 'inherit' }}>
+                    {wallet.isConnected && wallet.address ? wallet.address : userData.address}
                   </div>
                   <div style={{ fontSize: '0.9rem', opacity: 0.6 }}>
-                    Swimming since {new Date(userData.joinDate).toLocaleDateString()}
+                    {wallet.isConnected ? '📡 Connected to Katana blockchain' : `Swimming since ${new Date(userData.joinDate).toLocaleDateString()}`}
                   </div>
+                  {wallet.isConnected && fishtankData && (
+                    <div style={{ fontSize: '0.8rem', opacity: 0.8, marginTop: '0.5rem', color: '#00b894' }}>
+                      🎮 On-chain Score: {fishtankData.state.score} • Health: {fishtankData.state.health} • Lives: {fishtankData.state.lives}
+                    </div>
+                  )}
+                  {!wallet.isConnected && (
+                    <button 
+                      onClick={wallet.connect}
+                      style={{
+                        marginTop: '0.5rem',
+                        padding: '8px 16px',
+                        background: 'linear-gradient(135deg, #00ffff 0%, #0096ff 100%)',
+                        border: 'none',
+                        borderRadius: '8px',
+                        color: 'white',
+                        fontWeight: 'bold',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🔗 Connect Wallet
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -268,9 +313,24 @@ function Profile() {
                 marginBottom: '2rem'
               }}>
                 <StatCard icon="🎮" label="Games Played" value={userData.gamesPlayed} />
-                <StatCard icon="🏆" label="Best Score" value={userData.bestScore.toLocaleString()} color="#fdcb6e" />
-                <StatCard icon="📊" label="Total Score" value={userData.totalScore.toLocaleString()} color="#00b894" />
-                <StatCard icon="⏱️" label="Time Swimming" value={userData.totalTimeAlive} color="#a29bfe" />
+                <StatCard 
+                  icon="🏆" 
+                  label={wallet.isConnected && fishtankData ? "On-chain Score" : "Best Score"} 
+                  value={wallet.isConnected && fishtankData ? fishtankData.state.score : userData.bestScore.toLocaleString()} 
+                  color="#fdcb6e" 
+                />
+                <StatCard 
+                  icon="📊" 
+                  label={wallet.isConnected && fishtankData ? "Chain Health" : "Total Score"} 
+                  value={wallet.isConnected && fishtankData ? fishtankData.state.health : userData.totalScore.toLocaleString()} 
+                  color="#00b894" 
+                />
+                <StatCard 
+                  icon={wallet.isConnected && fishtankData ? "👤" : "⏱️"} 
+                  label={wallet.isConnected && fishtankData ? "Chain Lives" : "Time Swimming"} 
+                  value={wallet.isConnected && fishtankData ? fishtankData.state.lives : userData.totalTimeAlive} 
+                  color="#a29bfe" 
+                />
               </div>
 
               <div style={{
@@ -315,40 +375,28 @@ function Profile() {
         {/* Leaderboard Tab */}
         {activeTab === 'leaderboard' && (
           <div>
-            {/* Filter Buttons */}
+            {/* Katana Info */}
             <div style={{
               display: 'flex',
               justifyContent: 'center',
               gap: '1rem',
               marginBottom: '2rem'
             }}>
-              {[
-                { id: 'all', label: 'All Chains', icon: '🌐' },
-                { id: 'ethereum', label: 'Ethereum', icon: '⟠' },
-                { id: 'katana', label: 'Katana', icon: '🗡️' }
-              ].map(filter => (
-                <button
-                  key={filter.id}
-                  onClick={() => setLeaderboardFilter(filter.id)}
-                  style={{
-                    background: leaderboardFilter === filter.id ? 'linear-gradient(135deg, #fdcb6e 0%, #e17055 100%)' : 'rgba(255,255,255,0.1)',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '8px 16px',
-                    color: 'white',
-                    fontSize: '0.9rem',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <span>{filter.icon}</span>
-                  {filter.label}
-                </button>
-              ))}
+              <div style={{
+                background: 'linear-gradient(135deg, #a29bfe 0%, #6c5ce7 100%)',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '8px 16px',
+                color: 'white',
+                fontSize: '0.9rem',
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <span>🗡️</span>
+                Katana Blockchain Leaderboard
+              </div>
             </div>
 
             {/* Leaderboard */}
@@ -364,22 +412,39 @@ function Profile() {
                 color: '#fdcb6e',
                 textAlign: 'center'
               }}>
-                🏆 Top Swimmers {leaderboardFilter !== 'all' && `- ${leaderboardFilter === 'ethereum' ? 'Ethereum' : 'Katana'}`}
+                🏆 Top Katana Swimmers
               </h3>
+
+              {/* Blockchain Status */}
+              <div style={{ 
+                textAlign: 'center', 
+                marginBottom: '1rem',
+                padding: '0.5rem',
+                background: realLeaderboard.length > 0 ? 'rgba(0, 184, 148, 0.1)' : 'rgba(255, 107, 107, 0.1)',
+                borderRadius: '8px',
+                fontSize: '0.9rem'
+              }}>
+                {leaderboardLoading && '⏳ Loading blockchain data...'}
+                {leaderboardError && `❌ ${leaderboardError}`}
+                {!leaderboardLoading && !leaderboardError && realLeaderboard.length > 0 && 
+                  `📡 Live data from Katana blockchain • ${leaderboard.totalPlayers} total players`}
+                {!leaderboardLoading && !leaderboardError && realLeaderboard.length === 0 && 
+                  '🎮 Showing demo data - play to see live scores!'}
+              </div>
               
               <div>
                 {filteredLeaderboard.map(player => (
                   <LeaderboardRow 
-                    key={player.rank + player.chain} 
+                    key={player.address || (player.rank + player.chain)} 
                     player={player} 
-                    isCurrentUser={player.username === userData.username}
+                    isCurrentUser={wallet.address && player.address && player.address.toLowerCase() === wallet.address.toLowerCase()}
                   />
                 ))}
               </div>
 
               {filteredLeaderboard.length === 0 && (
                 <div style={{ textAlign: 'center', opacity: 0.6, padding: '2rem' }}>
-                  No swimmers found for {leaderboardFilter} chain
+                  No swimmers found on Katana blockchain
                 </div>
               )}
             </div>

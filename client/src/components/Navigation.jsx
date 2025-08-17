@@ -105,7 +105,7 @@ function Navigation() {
     <nav style={navStyle}>
       <div style={navContainerStyle}>
         <Link to="/" style={logoStyle}>
-          🌊 Fishtank: Liquidity Hunter
+          🌊 DeFi Current
         </Link>
         
         <div style={{ display: 'flex', alignItems: 'center' }}>

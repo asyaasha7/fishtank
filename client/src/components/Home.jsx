@@ -8,6 +8,7 @@ import { PaymentModal } from './PaymentModal'
 import { useWallet } from '../hooks/useWallet'
 import { fetchAndAnalyzeTransactions } from '../services/ethereumApi'
 import { scoreRisk } from '../utils/riskScoring'
+import { recordRiskEvent, recordHealthRefill, submitScore } from '../chain/fishtank'
 
 // Convert transaction to character format with improved creature distribution
 function transactionToCharacter(tx) {
@@ -63,7 +64,7 @@ function Home() {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
   const [refreshCountdown, setRefreshCountdown] = useState(10)
   const [isAutoRefreshing, setIsAutoRefreshing] = useState(false)
-  const [selectedChain, setSelectedChain] = useState('ethereum')
+  const [selectedChain] = useState('katana')
   
   // Payment system states
   const [gameHealth, setGameHealth] = useState(8) // Start with full health (8 hits from Toxic Predator = 1 life lost)
@@ -139,14 +140,7 @@ function Home() {
     };
   }, [selectedChain, isPaused]) // Reload when chain changes or pause state changes
 
-  const handleChainSwitch = (newChain) => {
-    if (newChain !== selectedChain) {
-      console.log(`🔄 Switching from ${selectedChain} to ${newChain}`)
-      setSelectedChain(newChain)
-      setRefreshCountdown(10) // Reset countdown
-      // The useEffect will trigger a reload automatically
-    }
-  }
+
 
   const loadTransactions = async (isInitialLoad = false) => {
     try {
@@ -158,6 +152,13 @@ function Home() {
         console.log('🎯 Generated characters:', characterList.map(c => c.name))
         console.log('🦈 Toxic Predators found:', characterList.filter(c => c.name === "Toxic Predator").length)
         setCharacters(characterList)
+        
+        // Record risk events for initial load
+        characterList.forEach(character => {
+          if (character.name === "Toxic Predator" && character.riskScore >= 80) {
+            recordRisk(character.riskScore, "Toxic Predator Spawned");
+          }
+        });
         
         // Check data source for better user feedback
         const dataSource = transactions[0]?.id?.includes('katana_') 
@@ -172,6 +173,13 @@ function Home() {
         const newCharacterList = newTransactions.map(transactionToCharacter)
         
         setCharacters(prevCharacters => {
+          // Record risk events for new characters
+          newCharacterList.forEach(character => {
+            if (character.name === "Toxic Predator" && character.riskScore >= 80) {
+              recordRisk(character.riskScore, "Toxic Predator Spawned");
+            }
+          });
+          
           // Add new transactions to the end and remove old ones from the front
           const maxTransactions = 50 // Maintain a rolling buffer of 50 transactions
           const updatedCharacters = [...prevCharacters, ...newCharacterList]
@@ -216,11 +224,13 @@ function Home() {
           isOpen: true,
           paymentInfo: paymentInfo.payment
         });
-      } else if (response.ok) {
+      } else       if (response.ok) {
         // Payment already processed
         const result = await response.json();
         setGameHealth(result.newHealth);
         console.log('Health refilled:', result);
+        // Record on blockchain
+        await onRefillDone(result.newHealth);
       } else {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
@@ -247,6 +257,8 @@ function Home() {
         const result = await response.json();
         setGameHealth(result.newHealth);
         console.log('Health refilled successfully:', result);
+        // Record on blockchain
+        await onRefillDone(result.newHealth);
       } else {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
@@ -289,6 +301,40 @@ function Home() {
     } catch (error) {
       console.error('Onramp error:', error);
       alert(`Failed to open onramp: ${error.message}`);
+    }
+  };
+
+  // Blockchain integration functions
+  const recordRisk = async (riskScore, eventType) => {
+    if (!wallet.address) return;
+    
+    try {
+      console.log(`📡 Recording risk event: ${eventType}, score: ${riskScore}`);
+      await recordRiskEvent(wallet.address, riskScore, eventType);
+    } catch (error) {
+      console.error('Failed to record risk event:', error);
+    }
+  };
+
+  const onRefillDone = async (newHealth) => {
+    if (!wallet.address) return;
+    
+    try {
+      console.log(`📡 Recording health refill: ${newHealth}`);
+      await recordHealthRefill(wallet.address, newHealth);
+    } catch (error) {
+      console.error('Failed to record health refill:', error);
+    }
+  };
+
+  const onGameOver = async (finalScore, finalHealth, finalLives) => {
+    if (!wallet.address) return;
+    
+    try {
+      console.log(`📡 Submitting final score: ${finalScore}, health: ${finalHealth}, lives: ${finalLives}`);
+      await submitScore(wallet.address, finalScore, finalHealth, finalLives);
+    } catch (error) {
+      console.error('Failed to submit score:', error);
     }
   };
 
@@ -384,73 +430,24 @@ function Home() {
         </div>
         
         <div style={{ display: 'flex', gap: '8px', flexDirection: 'row', justifyContent: 'center' }}>
-          {/* Ethereum Button */}
-          <button
-            onClick={() => handleChainSwitch('ethereum')}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '6px',
-              border: selectedChain === 'ethereum' ? '2px solid #00ffff' : '1px solid rgba(255,255,255,0.3)',
-              background: selectedChain === 'ethereum' ? 'rgba(0, 255, 255, 0.2)' : 'rgba(255,255,255,0.1)',
-              color: selectedChain === 'ethereum' ? '#00ffff' : '#ffffff',
-              fontSize: '12px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px'
-            }}
-            onMouseEnter={(e) => {
-              if (selectedChain !== 'ethereum') {
-                e.target.style.background = 'rgba(255,255,255,0.2)'
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (selectedChain !== 'ethereum') {
-                e.target.style.background = 'rgba(255,255,255,0.1)'
-              }
-            }}
-          >
-            <span style={{ fontSize: '14px' }}>⟠</span>
-            Ethereum
-            {selectedChain === 'ethereum' && <span style={{ fontSize: '10px' }}>✓</span>}
-          </button>
-          
-          {/* Katana Button */}
-          <button
-            onClick={() => handleChainSwitch('katana')}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '6px',
-              border: selectedChain === 'katana' ? '2px solid #a29bfe' : '1px solid rgba(255,255,255,0.3)',
-              background: selectedChain === 'katana' ? 'rgba(162, 155, 254, 0.2)' : 'rgba(255,255,255,0.1)',
-              color: selectedChain === 'katana' ? '#a29bfe' : '#ffffff',
-              fontSize: '12px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px'
-            }}
-            onMouseEnter={(e) => {
-              if (selectedChain !== 'katana') {
-                e.target.style.background = 'rgba(255,255,255,0.2)'
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (selectedChain !== 'katana') {
-                e.target.style.background = 'rgba(255,255,255,0.1)'
-              }
-            }}
-          >
+          {/* Katana Indicator */}
+          <div style={{
+            padding: '8px 16px',
+            borderRadius: '6px',
+            border: '2px solid #a29bfe',
+            background: 'rgba(162, 155, 254, 0.2)',
+            color: '#a29bfe',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px'
+          }}>
             <span style={{ fontSize: '14px' }}>🗡️</span>
-            Katana
-            {selectedChain === 'katana' && <span style={{ fontSize: '10px' }}>✓</span>}
-          </button>
+            Katana Blockchain
+            <span style={{ fontSize: '10px' }}>✓</span>
+          </div>
         </div>
         
         <div style={{ 
@@ -460,7 +457,7 @@ function Home() {
           marginTop: '8px',
           textAlign: 'center'
         }}>
-          {selectedChain === 'ethereum' ? 'Mainnet transactions' : 'Gaming ecosystem'}
+          Gaming ecosystem powered by Katana
         </div>
       </div>
       
@@ -472,7 +469,7 @@ function Home() {
           left: 0,
           width: '100%',
           height: 'calc(100vh - 60px)',
-          zIndex: 0
+          zIndex: 1000
         }}>
           <FishtankGame 
             characters={characters} 
@@ -489,6 +486,8 @@ function Home() {
             setShieldTimeLeft={setShieldTimeLeft}
             isPaused={isPaused}
             setIsPaused={setIsPaused}
+            recordRisk={recordRisk}
+            onGameOver={onGameOver}
           />
         </div>
       )}

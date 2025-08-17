@@ -471,7 +471,7 @@ function Explore() {
   const [groupedCharacters, setGroupedCharacters] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [selectedChain, setSelectedChain] = useState('ethereum')
+  const [selectedChain] = useState('katana')
 
   // Group characters by their transaction type
   const groupCharactersByType = (characters) => {
@@ -489,13 +489,7 @@ function Explore() {
     loadTransactions()
   }, [selectedChain]) // Reload when chain changes
 
-  const handleChainSwitch = (newChain) => {
-    if (newChain !== selectedChain) {
-      console.log(`🔄 Switching Explore page from ${selectedChain} to ${newChain}`)
-      setSelectedChain(newChain)
-      // The useEffect will trigger a reload automatically
-    }
-  }
+
 
   const loadTransactions = async () => {
     try {
@@ -619,76 +613,29 @@ function Explore() {
           Liquidity Pool Analysis
         </h1>
         
-        {/* Chain Switching Controls */}
+        {/* Katana Network Indicator */}
         <div style={{
           display: 'flex',
           justifyContent: 'center',
           gap: '12px',
           marginBottom: '2rem'
         }}>
-          <button
-            onClick={() => handleChainSwitch('ethereum')}
-            style={{
-              padding: '10px 20px',
-              borderRadius: '8px',
-              border: selectedChain === 'ethereum' ? '2px solid #00ffff' : '1px solid rgba(255,255,255,0.3)',
-              background: selectedChain === 'ethereum' ? 'rgba(0, 255, 255, 0.2)' : 'rgba(255,255,255,0.1)',
-              color: selectedChain === 'ethereum' ? '#00ffff' : '#ffffff',
-              fontSize: '14px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-            onMouseEnter={(e) => {
-              if (selectedChain !== 'ethereum') {
-                e.target.style.background = 'rgba(255,255,255,0.2)'
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (selectedChain !== 'ethereum') {
-                e.target.style.background = 'rgba(255,255,255,0.1)'
-              }
-            }}
-          >
-            <span style={{ fontSize: '16px' }}>⟠</span>
-            Ethereum Mainnet
-            {selectedChain === 'ethereum' && <span style={{ fontSize: '12px' }}>✓</span>}
-          </button>
-          
-          <button
-            onClick={() => handleChainSwitch('katana')}
-            style={{
-              padding: '10px 20px',
-              borderRadius: '8px',
-              border: selectedChain === 'katana' ? '2px solid #a29bfe' : '1px solid rgba(255,255,255,0.3)',
-              background: selectedChain === 'katana' ? 'rgba(162, 155, 254, 0.2)' : 'rgba(255,255,255,0.1)',
-              color: selectedChain === 'katana' ? '#a29bfe' : '#ffffff',
-              fontSize: '14px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-            onMouseEnter={(e) => {
-              if (selectedChain !== 'katana') {
-                e.target.style.background = 'rgba(255,255,255,0.2)'
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (selectedChain !== 'katana') {
-                e.target.style.background = 'rgba(255,255,255,0.1)'
-              }
-            }}
-          >
+          <div style={{
+            padding: '10px 20px',
+            borderRadius: '8px',
+            border: '2px solid #a29bfe',
+            background: 'rgba(162, 155, 254, 0.2)',
+            color: '#a29bfe',
+            fontSize: '14px',
+            fontWeight: 'bold',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
             <span style={{ fontSize: '16px' }}>🗡️</span>
-            Katana Network
-            {selectedChain === 'katana' && <span style={{ fontSize: '12px' }}>✓</span>}
-          </button>
+            Katana Blockchain Explorer
+            <span style={{ fontSize: '12px' }}>✓</span>
+          </div>
         </div>
         
         <div style={{
@@ -709,10 +656,7 @@ function Explore() {
             marginBottom: '1.5rem',
             fontStyle: 'italic'
           }}>
-            {selectedChain === 'ethereum' 
-              ? 'Swimming through Ethereum seas via Etherscan V2 API, detecting predators and toxic pools'
-              : 'Exploring Katana coral reefs and gaming ecosystem currents, including bridge depths and NFT treasures'
-            }
+            Exploring Katana coral reefs and gaming ecosystem currents, including bridge depths and NFT treasures
           </p>
           
           <button 

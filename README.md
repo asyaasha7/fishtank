@@ -1,4 +1,4 @@
-# 🌊 Fishtank: Liquidity Hunter
+# 🌊 DeFi Current
 
 A real-time 3D blockchain game where you play as a fish navigating through live cryptocurrency transactions, now with **Coinbase Developer Platform (CDP)** integration for seamless Base payments!
 

@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useDifficulty, useFishtankData } from '../hooks/useFishtank';
+import { useWallet } from '../hooks/useWallet';
 
 interface HUDProps {
   health: number;
@@ -41,6 +43,11 @@ export const HUD: React.FC<ExtendedHUDProps> = ({
   const [isRefilling, setIsRefilling] = useState(false);
   const hearts = Math.ceil(health / 8); // 8 HP per heart (8 hits from Toxic Predator = 1 life lost)
   const maxHearts = Math.ceil(maxHealth / 8); // Show 1 heart that represents 8 health points
+
+  // Blockchain data hooks
+  const wallet = useWallet();
+  const { difficulty, loading: difficultyLoading, error: difficultyError } = useDifficulty();
+  const { data: fishtankData, loading: fishtankLoading } = useFishtankData(wallet.address || null);
 
   const handleRefill = async () => {
     setIsRefilling(true);
@@ -107,7 +114,54 @@ export const HUD: React.FC<ExtendedHUDProps> = ({
         </div>
       </div>
 
-
+      {/* Blockchain Data Section */}
+      <div className="hud-section">
+        <div className="blockchain-stats">
+          <div className="blockchain-title">📡 Katana Blockchain</div>
+          <div className="blockchain-info">
+            <div className="stat-item">
+              <span className="stat-label">Difficulty:</span>
+              <span className="stat-value">
+                {difficultyLoading ? '⏳' : difficultyError ? '❌ Error' : difficulty}
+              </span>
+            </div>
+            {difficultyError && (
+              <div className="blockchain-error">
+                ⚠️ {difficultyError}
+              </div>
+            )}
+            {wallet.isConnected && (
+              <div className="stat-item">
+                <span className="stat-label">On-chain Score:</span>
+                <span className="stat-value">
+                  {fishtankLoading ? '⏳' : (fishtankData?.state.score || '0')}
+                </span>
+              </div>
+            )}
+            {wallet.isConnected && fishtankData && (
+              <>
+                <div className="stat-item">
+                  <span className="stat-label">Chain Health:</span>
+                  <span className="stat-value">{fishtankData.state.health}</span>
+                </div>
+                <div className="stat-item">
+                  <span className="stat-label">Chain Lives:</span>
+                  <span className="stat-value">{fishtankData.state.lives}</span>
+                </div>
+                <div className="stat-item">
+                  <span className="stat-label">Level:</span>
+                  <span className="stat-value">{fishtankData.state.level}</span>
+                </div>
+              </>
+            )}
+            {!wallet.isConnected && (
+              <div className="blockchain-connect-prompt">
+                💡 Connect wallet to see on-chain stats
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Health & Lives Progress */}
       <div className="hud-section">

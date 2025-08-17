@@ -114,8 +114,10 @@ export async function recordHealthRefill(player: string, newHealth: number) {
   }
 }
 
-export async function submitScore(player: string, score: number, health: number, lives: number) {
+export async function submitScore(player: string, score: number) {
   try {
+    console.log(`🏆 Client: Submitting score for player ${player}: ${score}`);
+    
     const response = await fetch('/api/fishtank/score/submit', {
       method: 'POST',
       headers: {
@@ -123,19 +125,20 @@ export async function submitScore(player: string, score: number, health: number,
       },
       body: JSON.stringify({
         player,
-        score,
-        health,
-        lives
+        score
       })
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorData = await response.json();
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.error || 'Unknown error'}`);
     }
 
-    return await response.json();
+    const result = await response.json();
+    console.log(`✅ Client: Score submitted successfully:`, result);
+    return result;
   } catch (error) {
-    console.error('Error submitting score:', error);
+    console.error('💥 Client: Error submitting score:', error);
     throw error;
   }
 }

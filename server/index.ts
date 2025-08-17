@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { ethers } from 'ethers';
+import { ethers, keccak256, toUtf8Bytes } from 'ethers';
 import FishtankGameStateABI from './abi/FishtankGameState.json';
 
 // Load environment variables
@@ -68,11 +68,15 @@ const domain = {
 };
 
 const types = {
-  ScoreSubmission: [
+  ScoreApproval: [
     { name: "player", type: "address" },
-    { name: "score", type: "uint256" },
-    { name: "health", type: "uint256" },
-    { name: "lives", type: "uint256" }
+    { name: "score", type: "uint64" },
+    { name: "runId", type: "bytes32" },
+    { name: "difficultyHint", type: "uint8" },
+    { name: "startedAt", type: "uint64" },
+    { name: "endedAt", type: "uint64" },
+    { name: "nonce", type: "uint256" },
+    { name: "deadline", type: "uint256" }
   ]
 };
 
@@ -253,10 +257,10 @@ app.post('/api/fishtank/event/health', async (req, res) => {
   }
 });
 
-// Submit score with EIP-712 signature
+// Submit score with EIP-712 ScoreApproval (Reporter path)
 app.post('/api/fishtank/score/submit', async (req, res) => {
   try {
-    const { player, score, health, lives } = req.body;
+    const { player, score } = req.body;
 
     if (!ethers.isAddress(player)) {
       return res.status(400).json({ error: 'Invalid player address' });
@@ -266,54 +270,92 @@ app.post('/api/fishtank/score/submit', async (req, res) => {
       return res.status(400).json({ error: 'Invalid score' });
     }
 
-    if (typeof health !== 'number' || health < 0) {
-      return res.status(400).json({ error: 'Invalid health' });
-    }
+    console.log(`🏆 Submitting score: ${player}, score: ${score}`);
 
-    if (typeof lives !== 'number' || lives < 0) {
-      return res.status(400).json({ error: 'Invalid lives' });
-    }
+    // Read the player's nonce from the contract
+    const nonce = await fishtankContract.nonces(player);
+    console.log(`📋 Player nonce: ${nonce}`);
 
-    // Create EIP-712 signature
-    const message = {
+    // Get current difficulty
+    const difficultyHint = Number(await fishtankContract.difficulty());
+    console.log(`🎯 Difficulty hint: ${difficultyHint}`);
+
+    // Create timestamps
+    const now = Math.floor(Date.now() / 1000);
+    const startedAt = now - 60; // Assume game started 1 minute ago
+    const endedAt = now;
+    const deadline = now + 600; // 10 minutes from now
+
+    // Generate unique runId
+    const runId = keccak256(toUtf8Bytes(`run:${player}:${Date.now()}`));
+    console.log(`🎮 Run ID: ${runId}`);
+
+    // Build EIP-712 ScoreApproval
+    const approval = {
       player,
       score: BigInt(score),
-      health: BigInt(health),
-      lives: BigInt(lives)
+      runId,
+      difficultyHint,
+      startedAt: BigInt(startedAt),
+      endedAt: BigInt(endedAt),
+      nonce: BigInt(nonce),
+      deadline: BigInt(deadline)
     };
 
-    const signature = await signerWallet.signTypedData(domain, types, message);
+    console.log('📝 Score approval:', approval);
 
-    console.log(`Submitting score: ${player}, score: ${score}, health: ${health}, lives: ${lives}`);
-    
-    // Check if signer has required role (for debugging)
+    // Sign with the Signer key
+    const signature = await signerWallet.signTypedData(domain, types, approval);
+    console.log(`✍️  Signature: ${signature}`);
+
+    // Check roles (for debugging)
     try {
       const signerRole = await fishtankContract.SIGNER_ROLE();
+      const reporterRole = await fishtankContract.REPORTER_ROLE();
       const hasSignerRole = await fishtankContract.hasRole(signerRole, signerWallet.address);
+      const hasReporterRole = await fishtankContract.hasRole(reporterRole, reporterWallet.address);
+      
       console.log(`🔐 Signer role check: ${signerWallet.address} has SIGNER_ROLE: ${hasSignerRole}`);
+      console.log(`🔐 Reporter role check: ${reporterWallet.address} has REPORTER_ROLE: ${hasReporterRole}`);
       
       if (!hasSignerRole) {
         console.warn(`⚠️  Warning: Signer wallet ${signerWallet.address} does not have SIGNER_ROLE`);
       }
+      if (!hasReporterRole) {
+        console.warn(`⚠️  Warning: Reporter wallet ${reporterWallet.address} does not have REPORTER_ROLE`);
+      }
     } catch (roleError) {
-      console.log(`🔍 Role check failed (contract might not support roles):`, roleError.message);
+      console.log(`🔍 Role check failed:`, roleError.message);
     }
 
-    // Submit to contract with manual gas settings
-    const gasLimit = 200000; // Set a reasonable gas limit
-    const tx = await fishtankContract.submitScore(player, score, health, lives, signature, {
+    // Submit using submitScoreByReporter (gasless for players)
+    const gasLimit = 300000; // Increased gas limit for reporter call
+    const tx = await fishtankContract.submitScoreByReporter(approval, signature, {
       gasLimit: gasLimit
     });
+    console.log(`📡 Transaction sent: ${tx.hash}`);
+    
     const receipt = await tx.wait();
+    console.log(`✅ Transaction confirmed: ${receipt.hash} (block: ${receipt.blockNumber})`);
 
     res.json({
       success: true,
       txHash: receipt.hash,
       blockNumber: receipt.blockNumber,
-      signature
+      signature,
+      approval: {
+        player: approval.player,
+        score: approval.score.toString(),
+        runId: approval.runId,
+        difficultyHint: approval.difficultyHint,
+        startedAt: approval.startedAt.toString(),
+        endedAt: approval.endedAt.toString(),
+        nonce: approval.nonce.toString(),
+        deadline: approval.deadline.toString()
+      }
     });
   } catch (error) {
-    console.error('Error submitting score:', error);
+    console.error('💥 Error submitting score:', error);
     
     // Provide more specific error messages
     let errorMessage = 'Failed to submit score';
@@ -323,6 +365,10 @@ app.post('/api/fishtank/score/submit', async (req, res) => {
       errorMessage = 'Insufficient funds for transaction';
     } else if (error.message.includes('nonce')) {
       errorMessage = 'Transaction nonce issue';
+    } else if (error.message.includes('paused')) {
+      errorMessage = 'Contract is paused';
+    } else if (error.message.includes('deadline')) {
+      errorMessage = 'Signature deadline exceeded';
     }
     
     res.status(500).json({ 

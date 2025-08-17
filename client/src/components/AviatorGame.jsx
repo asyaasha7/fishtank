@@ -2,6 +2,8 @@ import React, { useRef, useState, useEffect, useMemo } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import GLTFCharacter from './GLTFCharacter'
+import ToxicWasteModel from './ToxicWasteModel'
+import MineModel from './MineModel'
 
 // Game state and utilities
 let gameState = {
@@ -167,7 +169,7 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
       let oscillationSpeed = 1.5; // Default wave speed
       
       if (character.name === "Toxic Predator") {
-        movementSpeed = 15; // Keep aggressive speed
+        movementSpeed = 10; // Keep aggressive speed
         oscillationAmplitude = 2.0; // More dramatic curves
         oscillationSpeed = 2.5; // Faster, more menacing movement
         
@@ -181,7 +183,7 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
           currentPosition.current[2] = sphereRef.current.position.z;
         }
       } else if (character.name === "Treasure Jellyfish") {
-        movementSpeed = 10; // Moderate speed for collectibles
+        movementSpeed = 8; // Moderate speed for collectibles
         oscillationAmplitude = 1.8; // Graceful movement
         oscillationSpeed = 1.2; // Slower, more elegant
         
@@ -357,6 +359,32 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
           <meshBasicMaterial color="#ffffff" />
         </mesh>
       </group>
+    )
+  }
+
+  // Special GLTF model for Toxic Predator
+  if (character.name === "Toxic Predator") {
+    return (
+      <ToxicWasteModel
+        character={character}
+        currentPosition={currentPosition.current}
+        scale={scale}
+        color={color}
+        ref={meshRef}
+      />
+    )
+  }
+
+  // Special GLTF model for Pufferfish Trap (Mine)
+  if (character.name === "Pufferfish Trap") {
+    return (
+      <MineModel
+        character={character}
+        currentPosition={currentPosition.current}
+        scale={scale}
+        color={color}
+        ref={meshRef}
+      />
     )
   }
 

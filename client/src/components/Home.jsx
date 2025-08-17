@@ -338,8 +338,8 @@ function Home() {
     if (!wallet.address) return;
     
     try {
-      console.log(`📡 Submitting final score: ${finalScore}, health: ${finalHealth}, lives: ${finalLives}`);
-      await submitScore(wallet.address, finalScore, finalHealth, finalLives);
+      console.log(`📡 Submitting final score: ${finalScore} (health: ${finalHealth}, lives: ${finalLives})`);
+      await submitScore(wallet.address, finalScore);
     } catch (error) {
       console.error('Failed to submit score:', error);
     }

@@ -148,37 +148,71 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
 
   useFrame((state, delta) => {
     if (meshRef.current && !isCollected) {
-      // Different movement speeds based on character type
+      const time = state.clock.getElapsedTime();
+      
+      // Create a unique phase offset for each character based on their ID
+      let hash = 0;
+      for (let i = 0; i < character.id.length; i++) {
+        hash = ((hash << 5) - hash + character.id.charCodeAt(i)) & 0xffffffff;
+      }
+      const uniqueOffset = Math.abs(hash % 1000) * 0.001;
+      
+      // Different movement patterns based on character type
       let movementSpeed = 15; // Default speed
+      let oscillationAmplitude = 1.2; // Default oscillation
+      let oscillationSpeed = 1.5; // Default wave speed
       
       if (character.name === "Toxic Predator") {
-        console.log("HERE WE ARE")
-        movementSpeed = 15; // Keep same speed as default for dangerous cubes
+        movementSpeed = 15; // Keep aggressive speed
+        oscillationAmplitude = 2.0; // More dramatic curves
+        oscillationSpeed = 2.5; // Faster, more menacing movement
         
-        // Add vertical oscillation to make Toxic Predators more menacing
-        const time = state.clock.getElapsedTime();
-        const oscillationAmplitude = 1.5; // How far up/down they move
-        const oscillationSpeed = 2.0; // How fast they oscillate
-        // Create a numeric hash from the character ID for unique offset
-        let hash = 0;
-        for (let i = 0; i < character.id.length; i++) {
-          hash = ((hash << 5) - hash + character.id.charCodeAt(i)) & 0xffffffff;
-        }
-        const uniqueOffset = Math.abs(hash % 1000) * 0.001; // Unique phase offset for each predator
-        
-        currentPosition.current[1] += Math.sin(time * oscillationSpeed + uniqueOffset) * oscillationAmplitude * delta;
-        
-        // Keep them within reasonable bounds
-        currentPosition.current[1] = Math.max(-4, Math.min(4, currentPosition.current[1]));
+        // Add sine wave movement with some aggression
+        const primaryWave = Math.sin(time * oscillationSpeed + uniqueOffset) * oscillationAmplitude;
+        const secondaryWave = Math.sin(time * oscillationSpeed * 1.7 + uniqueOffset + Math.PI/3) * (oscillationAmplitude * 0.3);
+        currentPosition.current[1] += (primaryWave + secondaryWave) * delta;
         
         // Make Toxic Predator swim close to the player's Z-axis for better collision
         if (sphereRef.current) {
-          currentPosition.current[2] = sphereRef.current.position.z; // Match player's Z position (2)
+          currentPosition.current[2] = sphereRef.current.position.z;
         }
+      } else if (character.name === "Treasure Jellyfish") {
+        movementSpeed = 10; // Moderate speed for collectibles
+        oscillationAmplitude = 1.8; // Graceful movement
+        oscillationSpeed = 1.2; // Slower, more elegant
+        
+        // Smooth, flowing movement like a jellyfish
+        const primaryWave = Math.sin(time * oscillationSpeed + uniqueOffset) * oscillationAmplitude;
+        const flowWave = Math.cos(time * oscillationSpeed * 0.8 + uniqueOffset) * (oscillationAmplitude * 0.5);
+        currentPosition.current[1] += (primaryWave + flowWave) * delta;
+      } else if (character.name === "Pufferfish Trap") {
+        movementSpeed = 6; // Slower, more predictable
+        oscillationAmplitude = 0.8; // Smaller movements
+        oscillationSpeed = 1.0; // Steady pace
+        
+        // Gentle bobbing motion
+        currentPosition.current[1] += Math.sin(time * oscillationSpeed + uniqueOffset) * oscillationAmplitude * delta;
+      } else if (character.name === "Turbulent Current") {
+        movementSpeed = 12; // Medium speed
+        oscillationAmplitude = 2.5; // Large, turbulent movements
+        oscillationSpeed = 3.0; // Fast, chaotic
+        
+        // Chaotic, turbulent movement
+        const turbulence1 = Math.sin(time * oscillationSpeed + uniqueOffset) * oscillationAmplitude;
+        const turbulence2 = Math.sin(time * oscillationSpeed * 1.3 + uniqueOffset + Math.PI/2) * (oscillationAmplitude * 0.6);
+        const turbulence3 = Math.sin(time * oscillationSpeed * 2.1 + uniqueOffset + Math.PI) * (oscillationAmplitude * 0.2);
+        currentPosition.current[1] += (turbulence1 + turbulence2 + turbulence3) * delta;
       } else {
-        // Make other cubes swim slower
-        movementSpeed = 8; // Slower speed for non-dangerous cubes
+        // Standard transaction - simple, gentle movement
+        movementSpeed = 8; // Slower speed for standard
+        oscillationAmplitude = 1.0; // Gentle curves
+        oscillationSpeed = 1.0; // Calm movement
+        
+        currentPosition.current[1] += Math.sin(time * oscillationSpeed + uniqueOffset) * oscillationAmplitude * delta;
       }
+      
+      // Keep all characters within reasonable bounds
+      currentPosition.current[1] = Math.max(-4, Math.min(4, currentPosition.current[1]));
       
       // Move from right to left - use independent position tracking
       currentPosition.current[0] -= speed * delta * movementSpeed
@@ -335,6 +369,7 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
     </mesh>
   )
 }
+
 
 
 
@@ -1070,208 +1105,7 @@ export default function FishtankGame({ characters, mousePos }) {
         )}
       </div>
 
-      {/* Game UI Overlay */}
-      <div style={{
-        position: 'absolute',
-        bottom: '20px',
-        width: '443px',
-        right: '20px',
-        background: 'linear-gradient(135deg, rgba(0, 30, 60, 0.9) 0%, rgba(0, 20, 40, 0.95) 100%)',
-        border: '1px solid rgba(0, 255, 255, 0.3)',
-        boxShadow: '0 4px 20px rgba(0, 255, 255, 0.1)',
-        padding: '1.5rem',
-        borderRadius: '12px',
-        color: 'white',
-        fontSize: '1rem',
-        minWidth: '200px',
-        zIndex: 10
-      }}>
-        {/* Score */}
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between',
-          marginBottom: '1rem'
-        }}>
-          <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>SCORE</span>
-          <span style={{ 
-            fontSize: '1.5rem', 
-            fontWeight: 'bold', 
-            color: '#00ffff'
-          }}>
-            {score}
-          </span>
-        </div>
-        
-        {/* Recent points animation */}
-        {recentPoints && (
-          <div style={{
-            position: 'absolute',
-            top: '1rem',
-            right: '1rem',
-            color: '#00b894',
-            fontSize: '1.2rem',
-            fontWeight: 'bold',
-            animation: 'fadeInOut 1.5s ease-out',
-            pointerEvents: 'none'
-          }}>
-            +{recentPoints}
-          </div>
-        )}
-        
-        {/* Lives */}
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between',
-          marginBottom: '0.5rem'
-        }}>
-          <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>LIVES</span>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            {[...Array(3)].map((_, i) => (
-              <span 
-                key={i} 
-                style={{ 
-                  fontSize: '1.5rem',
-                  opacity: i < lives ? 1 : 0.3,
-                  transition: 'opacity 0.3s ease'
-                }}
-              >
-                ❤️
-              </span>
-            ))}
-          </div>
-        </div>
-        
-        {/* Health Progress Bar */}
-        <div style={{ marginBottom: '1rem' }}>
-          <div style={{ 
-            fontSize: '0.9rem', 
-            marginBottom: '0.5rem',
-            opacity: 0.8
-          }}>
-            Current Heart Health: {health}/3
-          </div>
-          <div style={{
-            width: '100%',
-            height: '8px',
-            backgroundColor: 'rgba(255,255,255,0.2)',
-            borderRadius: '4px',
-            overflow: 'hidden'
-          }}>
-            <div style={{
-              width: `${(health / 3) * 100}%`,
-              height: '100%',
-              backgroundColor: health > 2 ? '#00b894' : health > 1 ? '#fdcb6e' : '#ff6b6b',
-              transition: 'width 0.3s ease, background-color 0.3s ease',
-              borderRadius: '4px'
-            }} />
-          </div>
-          <div style={{ 
-            fontSize: '0.7rem', 
-            marginTop: '0.3rem',
-            opacity: 0.6,
-            textAlign: 'center'
-          }}>
-            🦈 3 hits from Toxic Predator = 1 life lost
-          </div>
-        </div>
-
-        {/* Shield Section */}
-        <div style={{ marginBottom: '1rem' }}>
-          {/* Shield Status */}
-          {isShieldActive && (
-            <div style={{
-              background: 'linear-gradient(135deg, rgba(0, 255, 255, 0.2) 0%, rgba(0, 150, 255, 0.2) 100%)',
-              border: '1px solid rgba(0, 255, 255, 0.4)',
-              borderRadius: '8px',
-              padding: '0.8rem',
-              marginBottom: '0.8rem',
-              textAlign: 'center',
-              boxShadow: '0 0 15px rgba(0, 255, 255, 0.3)'
-            }}>
-              <div style={{ 
-                fontSize: '1rem', 
-                fontWeight: 'bold',
-                color: '#00ffff',
-                marginBottom: '0.3rem'
-              }}>
-                🛡️ SHIELD ACTIVE
-              </div>
-              <div style={{ 
-                fontSize: '0.8rem', 
-                opacity: 0.8
-              }}>
-                Protection: {shieldTimeLeft}s remaining
-              </div>
-              <div style={{ 
-                fontSize: '0.7rem', 
-                opacity: 0.6,
-                marginTop: '0.2rem'
-              }}>
-                Blocking Toxic Predator & Pufferfish damage
-              </div>
-            </div>
-          )}
-
-          {/* Shield Purchase Button */}
-          <button
-            onClick={handleBuyShield}
-            disabled={score < 100 || isShieldActive}
-            style={{
-              width: '100%',
-              background: isShieldActive 
-                ? 'rgba(100, 100, 100, 0.3)' 
-                : score >= 100 
-                  ? 'linear-gradient(135deg, #00ffff 0%, #0096ff 100%)'
-                  : 'rgba(255, 255, 255, 0.2)',
-              border: 'none',
-              borderRadius: '8px',
-              padding: '12px 16px',
-              color: isShieldActive ? 'rgba(255, 255, 255, 0.5)' : 'white',
-              fontSize: '0.9rem',
-              fontWeight: 'bold',
-              cursor: isShieldActive || score < 100 ? 'not-allowed' : 'pointer',
-              transition: 'all 0.3s ease',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              opacity: isShieldActive || score < 100 ? 0.5 : 1
-            }}
-            onMouseEnter={(e) => {
-              if (!isShieldActive && score >= 100) {
-                e.target.style.boxShadow = '0 0 20px rgba(0, 255, 255, 0.4)'
-                e.target.style.transform = 'translateY(-1px)'
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isShieldActive && score >= 100) {
-                e.target.style.boxShadow = 'none'
-                e.target.style.transform = 'translateY(0)'
-              }
-            }}
-          >
-            <span style={{ fontSize: '1.1rem' }}>🛡️</span>
-            {isShieldActive 
-              ? 'Shield Active' 
-              : score >= 100 
-                ? 'Buy Shield (100 pts)' 
-                : `Need ${100 - score} more points`
-            }
-          </button>
-          
-          <div style={{ 
-            fontSize: '0.65rem', 
-            opacity: 0.6,
-            textAlign: 'center',
-            marginTop: '0.4rem'
-          }}>
-            💡 Shield protects against Toxic Predators & Pufferfish Traps for 10 seconds
-          </div>
-        </div>
-      
-      </div>
+   {/* here */}
       
       {/* Add CSS animations */}
       <style>{`

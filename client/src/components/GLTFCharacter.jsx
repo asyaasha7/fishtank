@@ -12,9 +12,9 @@ function ShieldEffect() {
     if (shieldRef.current && outerShieldRef.current) {
       const time = state.clock.getElapsedTime()
       
-      // Pulsing opacity effect
-      const pulseOpacity = 0.2 + Math.sin(time * 3) * 0.15 // Oscillates between 0.05 and 0.35
-      const outerPulseOpacity = 0.1 + Math.sin(time * 2) * 0.08 // Oscillates between 0.02 and 0.18
+      // Enhanced pulsing opacity effect
+      const pulseOpacity = 0.4 + Math.sin(time * 4) * 0.2 // Oscillates between 0.2 and 0.6
+      const outerPulseOpacity = 0.2 + Math.sin(time * 3) * 0.15 // Oscillates between 0.05 and 0.35
       
       // Rotating effect
       shieldRef.current.rotation.y += 0.01
@@ -26,16 +26,16 @@ function ShieldEffect() {
       outerShieldRef.current.material.opacity = outerPulseOpacity
       
       // Slight scaling effect for breathing
-      const scale = 1 + Math.sin(time * 2.5) * 0.05
+      const scale = 1 + Math.sin(time * 2.5) * 0.1
       shieldRef.current.scale.setScalar(scale)
-      outerShieldRef.current.scale.setScalar(scale * 1.1)
+      outerShieldRef.current.scale.setScalar(scale * 1.5)
     }
   })
   
   return (
     <group>
       {/* Inner shield - wireframe */}
-      <mesh ref={shieldRef} position={[0, 0, 0]}>
+      <mesh ref={shieldRef} position={[0, 3, 0]}>
         <sphereGeometry args={[0.9, 16, 16]} />
         <meshBasicMaterial 
           color="#00ffff" 
@@ -46,7 +46,7 @@ function ShieldEffect() {
       </mesh>
       
       {/* Outer shield - solid with glow */}
-      <mesh ref={outerShieldRef} position={[0, 0, 0]}>
+      <mesh ref={outerShieldRef} position={[0, 3, 0]}>
         <sphereGeometry args={[1.0, 12, 12]} />
         <meshBasicMaterial 
           color="#40e0d0" 
@@ -56,11 +56,17 @@ function ShieldEffect() {
         />
       </mesh>
       
-      {/* Glowing particles effect */}
+      {/* Enhanced glowing particles effect */}
       <pointLight 
         position={[0, 0, 0]} 
-        intensity={0.3} 
+        intensity={0.5} 
         color="#00ffff" 
+        distance={4}
+      />
+      <pointLight 
+        position={[0.5, 0.5, 0]} 
+        intensity={0.3} 
+        color="#40e0d0" 
         distance={3}
       />
     </group>
@@ -82,6 +88,11 @@ const GLTFCharacter = React.memo(({ mousePos, sphereRef, isShieldActive, modelPa
       console.log('GLTF scene object:', gltfData.scene)
     }
   }, [gltfData, hasGLTF])
+
+  // Debug shield state
+  React.useEffect(() => {
+    console.log('🛡️ GLTFCharacter shield state:', isShieldActive)
+  }, [isShieldActive])
   
   useFrame((state, delta) => {
     if (sphereRef.current && mousePos) {

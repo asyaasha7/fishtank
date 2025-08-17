@@ -1,0 +1,9 @@
+{
+  "name": "fishtank-api",
+  "version": "1.0.0",
+  "description": "Serverless API functions for Fishtank game",
+  "main": "index.js",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

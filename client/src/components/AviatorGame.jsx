@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useMemo } from 'react'
+import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import GLTFCharacter from './GLTFCharacter'
@@ -36,11 +36,16 @@ function takeDamage(amount = 1) {
     
     // Game over if no lives left
     if (gameState.lives <= 0) {
-      console.log('💀 Game Over! Final Score:', gameState.score)
-      gameState.isGameOver = true
+      if (gameState.addGameEvent) gameState.addGameEvent(`💀 Game Over! Final Score: ${gameState.score}`, 'damage');
       // Store final score but don't reset it yet - will be reset when new game starts
       gameState.finalScore = gameState.score
-      console.log('🏆 Final score stored:', gameState.finalScore)
+      if (gameState.addGameEvent) gameState.addGameEvent(`🏆 Final score stored: ${gameState.finalScore}`, 'info');
+      // Trigger game over immediately
+      if (gameState.triggerGameOver) {
+        gameState.triggerGameOver()
+      } else {
+        gameState.isGameOver = true // Fallback for when triggerGameOver isn't ready yet
+      }
     }
   }
 }
@@ -145,9 +150,9 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
     const colorMap = {
       "Toxic Predator": "#ff6b6b",
       "Pufferfish Trap": "#fdcb6e", 
-      "Turbulent Current": "#00bfff",
+      "Chaotic Vortex": "#00bfff",
       "Treasure Jellyfish": "#40e0d0",  // This is the collectible one!
-      "Standard Transaction": "#00b894"
+      "Standard Current": "#00b894"
     }
     return colorMap[characterName] || "#ffffff"
   }
@@ -158,8 +163,9 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
       
       // Create a unique phase offset for each character based on their ID
       let hash = 0;
-      for (let i = 0; i < character.id.length; i++) {
-        hash = ((hash << 5) - hash + character.id.charCodeAt(i)) & 0xffffffff;
+      const characterId = character.id || character.transaction?.id || 'default';
+      for (let i = 0; i < characterId.length; i++) {
+        hash = ((hash << 5) - hash + characterId.charCodeAt(i)) & 0xffffffff;
       }
       const uniqueOffset = Math.abs(hash % 1000) * 0.001;
       
@@ -198,18 +204,18 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
         
         // Gentle bobbing motion
         currentPosition.current[1] += Math.sin(time * oscillationSpeed + uniqueOffset) * oscillationAmplitude * delta;
-      } else if (character.name === "Turbulent Current") {
+      } else if (character.name === "Chaotic Vortex") {
         movementSpeed = 12; // Medium speed
-        oscillationAmplitude = 2.5; // Large, turbulent movements
+        oscillationAmplitude = 2.5; // Large, chaotic movements
         oscillationSpeed = 3.0; // Fast, chaotic
         
-        // Chaotic, turbulent movement
+        // Chaotic, vortex movement
         const turbulence1 = Math.sin(time * oscillationSpeed + uniqueOffset) * oscillationAmplitude;
         const turbulence2 = Math.sin(time * oscillationSpeed * 1.3 + uniqueOffset + Math.PI/2) * (oscillationAmplitude * 0.6);
         const turbulence3 = Math.sin(time * oscillationSpeed * 2.1 + uniqueOffset + Math.PI) * (oscillationAmplitude * 0.2);
         currentPosition.current[1] += (turbulence1 + turbulence2 + turbulence3) * delta;
       } else {
-        // Standard transaction - simple, gentle movement
+        // Standard Current - simple, gentle movement
         movementSpeed = 8; // Slower speed for standard
         oscillationAmplitude = 1.0; // Gentle curves
         oscillationSpeed = 1.0; // Calm movement
@@ -267,8 +273,8 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
           // Pufferfish Trap - lose points and make it disappear
           setIsCollected(true)
           onCollected(character, meshRef.current.position.clone(), 'points_loss')
-        } else if (character.name === "Turbulent Current") {
-          // Turbulent Current - push fish in random direction but stay active
+        } else if (character.name === "Chaotic Vortex") {
+          // Chaotic Vortex - push fish in random direction but stay active
           // Add cooldown to prevent continuous pushing
           const currentTime = Date.now();
           if (currentTime - lastPushTime > 1000) { // 1 second cooldown
@@ -291,19 +297,12 @@ function GameTransactionCube({ character, position, speed, scale, sphereRef, onC
   })
 
 
-  console.log(character.name)
-  console.log('isCollected', isCollected)
   // Don't render if collected
   if (isCollected) return null
 
   const color = getColor(character.name)
-  console.log('get color ')
-  console.log(color)
-  
-  // Add position debugging for Toxic Predators
-  if (character.name === "Toxic Predator") {
-    console.log(`🦈 Rendering Toxic Predator at position:`, currentPosition.current)
-  }
+
+
   // Special shape for Treasure Jellyfish (diamond/crystal)
   if (character.name === "Treasure Jellyfish") {
     return (
@@ -435,7 +434,6 @@ function GameCubes({ characters, sphereRef, onCubeCollected, isShieldActive, isP
           zPosition = 2 + (Math.random() - 0.5) * 0.4; // Similar to pufferfish but slightly tighter
           yPosition = (Math.random() - 0.5) * 3.5; // Slightly smaller Y range for more focused threat
           xPosition = 11 + Math.random() * 6 + (index - existingCount) * 2; // Start slightly closer for more aggressive approach
-          console.log(`🦈 Positioning Toxic Predator ${character.id} at [${xPosition}, ${yPosition}, ${zPosition}]`);
         } else if (character.name === "Pufferfish Trap") {
           zPosition = 2 + (Math.random() - 0.5) * 0.5; // Same Z-axis as player (2) for reliable collision
           yPosition = (Math.random() - 0.5) * 4; // -2 to +2 range
@@ -485,7 +483,7 @@ function GameCubes({ characters, sphereRef, onCubeCollected, isShieldActive, isP
 function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealthUpdate, onHealthUpdateNoFlash, isShieldActive, isPaused }) {
   const sphereRef = useRef()
   const [particles, setParticles] = useState([])
-
+  const [glitchEffect, setGlitchEffect] = useState(false)
   const handleCubeCollected = (character, position, type = 'collect') => {
     if (character.name === "Treasure Jellyfish") {
       // Add points for collecting MEV Detective
@@ -501,7 +499,7 @@ function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealth
       }
       setParticles(prev => [...prev, newParticle])
       
-      console.log(`🎯 Collected Treasure Jellyfish! +${points} points (Total: ${gameState.score})`)
+      addGameEvent(`🎯 Collected Treasure Jellyfish! +${points} points (Total: ${gameState.score})`, 'points');
     } else if (type === 'damage') {
       // Check if shield is active and this is a Toxic Predator
       if (isShieldActive && character.name === "Toxic Predator") {
@@ -533,7 +531,7 @@ function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealth
         }
         setParticles(prev => [...prev, newParticle])
         
-        console.log(`💥 Hit ${character.name}! Health: ${gameState.health}/${gameState.maxHealth}, Lives: ${gameState.lives}`)
+        addGameEvent(`💥 Hit ${character.name}! Health: ${gameState.health}/${gameState.maxHealth}, Lives: ${gameState.lives}`, 'damage');
       }
     } else if (type === 'points_loss') {
       // Check if shield is active for Pufferfish Trap
@@ -556,10 +554,15 @@ function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealth
           gameState.health = gameState.maxHealth;
         }
         if (gameState.lives <= 0) {
-          gameState.isGameOver = true;
           // Store final score but don't reset it yet - will be reset when new game starts
           gameState.finalScore = gameState.score;
-          console.log('🏆 Final score stored (Pufferfish):', gameState.finalScore);
+          if (gameState.addGameEvent) gameState.addGameEvent(`🏆 Final score stored (Pufferfish): ${gameState.finalScore}`, 'info');
+          // Trigger game over immediately
+          if (gameState.triggerGameOver) {
+            gameState.triggerGameOver()
+          } else {
+            gameState.isGameOver = true // Fallback for when triggerGameOver isn't ready yet
+          }
         }
         
         // Update UI without damage flash
@@ -579,7 +582,7 @@ function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealth
         }
         setParticles(prev => [...prev, newParticle])
         
-        console.log(`🐡 Hit Pufferfish Trap! Health: ${gameState.health}/${gameState.maxHealth}, Lives: ${gameState.lives}, -${pointsLost} points`)
+        addGameEvent(`🐡 Hit Pufferfish Trap! Health: ${gameState.health}/${gameState.maxHealth}, Lives: ${gameState.lives}, -${pointsLost} points`, 'damage');
       }
     } else if (type === 'push') {
       // Handle push effect from Turbulent Current
@@ -596,7 +599,7 @@ function GameScene({ characters, mousePos, onScoreUpdate, onLifeUpdate, onHealth
         sphereRef.current.position.y = newY;
       }
       
-      console.log(`🌊 Hit Turbulent Current! Fish pushed by current!`)
+      addGameEvent(`🌀 Hit Chaotic Vortex! Fish caught in vortex!`, 'collision');
     }
   }
 
@@ -665,7 +668,8 @@ export default function FishtankGame({
   loading = false,
   isAutoRefreshing = false,
   refreshCountdown = 10,
-  charactersCount = 0
+  charactersCount = 0,
+  addGameEvent = () => {} // Default no-op function
 }) {
   // Use props instead of local state for main game values
   const [score, setScore] = useState(gameScore || 0)
@@ -676,7 +680,7 @@ export default function FishtankGame({
   const [isGameOver, setIsGameOver] = useState(false)
   const [isRiskTypesCollapsed, setIsRiskTypesCollapsed] = useState(false)
   const [glitchEffect, setGlitchEffect] = useState(false)
-
+  const [over, setOver] = useState(false)
   // Sync local state with props when they change
   React.useEffect(() => {
     setScore(gameScore || 0)
@@ -696,9 +700,9 @@ export default function FishtankGame({
       return {
         "Toxic Predator": 0,
         "Pufferfish Trap": 0,
-        "Turbulent Current": 0,
+        "Chaotic Vortex": 0,
         "Treasure Jellyfish": 0,
-        "Standard Transaction": 0
+        "Standard Current": 0
       };
     }
     
@@ -710,9 +714,9 @@ export default function FishtankGame({
     return {
       "Toxic Predator": counts["Toxic Predator"] || 0,
       "Pufferfish Trap": counts["Pufferfish Trap"] || 0,
-      "Turbulent Current": counts["Turbulent Current"] || 0,
+      "Chaotic Vortex": counts["Chaotic Vortex"] || 0,
       "Treasure Jellyfish": counts["Treasure Jellyfish"] || 0,
-      "Standard Transaction": counts["Standard Transaction"] || 0
+      "Standard Current": counts["Standard Current"] || 0
     };
   }, [characters])
 
@@ -755,17 +759,6 @@ export default function FishtankGame({
     setHealth(newHealth)
     setGameHealth(newHealth) // Update parent state
     
-    // Check for game over
-    if (gameState.isGameOver) {
-      setIsGameOver(true)
-      // Keep the final score displayed until restart - don't reset to 0 yet
-      if (gameState.finalScore > 0) {
-        console.log('🏆 Game over - showing final score:', gameState.finalScore)
-        setScore(gameState.finalScore)
-        setGameScore(gameState.finalScore)
-      }
-    }
-    
     // Trigger damage flash effect
     setDamageFlash(true)
     setTimeout(() => setDamageFlash(false), 200)
@@ -774,17 +767,6 @@ export default function FishtankGame({
   const handleHealthUpdateNoFlash = (newHealth) => {
     setHealth(newHealth)
     setGameHealth(newHealth) // Update parent state
-    
-    // Check for game over without damage flash
-    if (gameState.isGameOver) {
-      setIsGameOver(true)
-      // Keep the final score displayed until restart - don't reset to 0 yet
-      if (gameState.finalScore > 0) {
-        console.log('🏆 Game over (no flash) - showing final score:', gameState.finalScore)
-        setScore(gameState.finalScore)
-        setGameScore(gameState.finalScore)
-      }
-    }
   }
 
   // Shield purchase is now handled at the Home component level
@@ -806,28 +788,36 @@ export default function FishtankGame({
     setGameScore(0)
     setGameHealth(8)
     setGameLives(3)
+    setOver(false)
   }
 
-  // Monitor game state for game over condition
-  useEffect(() => {
-    const checkGameOver = () => {
-      if (gameState.isGameOver && !isGameOver) {
-        // Use the stored final score instead of current score
-        const finalScore = gameState.finalScore || score
-        console.log('🎮 Game over detected - calling onGameOver with final score:', finalScore)
-        setIsGameOver(true)
-        // Call the blockchain score submission with final score
-        if (onGameOver) {
-          onGameOver(finalScore, health, lives)
-        }
+  // Trigger game over immediately when conditions are met
+  const triggerGameOver = useCallback(() => {
+    if (!over && !isGameOver) {
+      const finalScore = gameState.finalScore || score
+      console.log('🎮 Game over triggered - calling onGameOver with final score:', finalScore)
+      setIsGameOver(true)
+      setOver(true)
+      
+      // Update score display to show final score
+      if (gameState.finalScore > 0) {
+        console.log('🏆 Game over - showing final score:', gameState.finalScore)
+        setScore(gameState.finalScore)
+        setGameScore(gameState.finalScore)
+      }
+      
+      // Call the blockchain score submission with final score
+      if (onGameOver) {
+        onGameOver(finalScore, health, lives)
       }
     }
-    
-    // Check every 100ms for game over state changes
-    const interval = setInterval(checkGameOver, 100)
-    
-    return () => clearInterval(interval)
-  }, [isGameOver, onGameOver, score, health, lives])
+  }, [over, isGameOver, score, health, lives, onGameOver, setScore, setGameScore])
+
+  // Add triggerGameOver and addGameEvent to gameState so they can be called from anywhere
+  useEffect(() => {
+    gameState.triggerGameOver = triggerGameOver
+    gameState.addGameEvent = addGameEvent
+  }, [triggerGameOver, addGameEvent])
 
   if (!characters || characters.length === 0) {
     return null
@@ -1300,8 +1290,8 @@ export default function FishtankGame({
         
         <div style={{ marginBottom: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}>
-                          <span style={{ fontSize: '1.5rem', marginRight: '0.5rem' }}>🌊</span>
-              <strong style={{ color: '#00bfff' }}>Turbulent Current</strong>
+                          <span style={{ fontSize: '1.5rem', marginRight: '0.5rem' }}>🌀</span>
+              <strong style={{ color: '#00bfff' }}>Chaotic Vortex</strong>
               <span style={{ 
                 marginLeft: '0.5rem', 
                 fontSize: '0.8rem', 
@@ -1312,11 +1302,11 @@ export default function FishtankGame({
                 fontWeight: 'bold',
                 border: '1px solid rgba(0, 191, 255, 0.3)'
               }}>
-                {creatureCounts["Turbulent Current"]}
+                {creatureCounts["Chaotic Vortex"]}
               </span>
           </div>
           <p style={{ margin: '0 0 0 2rem', fontSize: '0.8rem', opacity: 0.9 }}>
-            DEX swaps with extreme slippage (&gt;15%), creating dangerous turbulence in shallow pools or exotic coral reefs.
+            DEX swaps with extreme slippage (&gt;15%), creating dangerous vortex patterns in shallow pools or exotic coral reefs.
           </p>
         </div>
       

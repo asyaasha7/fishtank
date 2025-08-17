@@ -7,7 +7,7 @@ function transactionToCharacter(tx) {
   const riskAnalysis = scoreRisk(tx)
   
   // Determine character type based on transaction characteristics
-  let characterType = "Standard Transaction"
+  let characterType = "Standard Current"
   let avatar = "💰"
   let background = "linear-gradient(135deg, #74b9ff 0%, #0984e3 100%)"
   
@@ -20,8 +20,8 @@ function transactionToCharacter(tx) {
     avatar = "🐡"
     background = "linear-gradient(135deg, #fdcb6e 0%, #e17055 100%)"
   } else if (tx.typeHints?.includes("Swap") || tx.dex?.name) {
-    characterType = "Turbulent Current"
-    avatar = "🌊"
+    characterType = "Chaotic Vortex"
+    avatar = "🌀"
     background = "linear-gradient(135deg, #00bfff 0%, #0096ff 100%)"
   } else if (tx.mev?.isSandwichLeg) {
     characterType = "Treasure Jellyfish"
@@ -60,9 +60,9 @@ function getCharacterDescription(type, riskAnalysis) {
   const descriptions = {
     "Toxic Predator": "Detecting suspicious token transfers in contaminated pools with unverified contracts",
     "Pufferfish Trap": "Monitoring token approvals to unknown currents and potentially malicious depths", 
-    "Turbulent Current": "Identifying DEX swaps with extreme turbulence indicating possible manipulation",
+    "Chaotic Vortex": "Identifying DEX swaps with extreme vortex patterns indicating possible manipulation",
     "Treasure Jellyfish": "Tracking MEV sandwich attacks and front-running patterns in transaction currents",
-    "Standard Transaction": "Regular blockchain transaction with standard risk characteristics"
+    "Standard Current": "Regular blockchain transaction with standard risk characteristics"
   }
   
   return descriptions[type] || "Analyzing transaction for potential security risks and anomalies"
@@ -82,11 +82,11 @@ const typeConfig = {
     gradient: "linear-gradient(135deg, #fdcb6e 0%, #e17055 100%)",
     description: "Monitoring infinite approvals to unknown currents"
   },
-  "Turbulent Current": {
-    icon: "🌊",
+  "Chaotic Vortex": {
+    icon: "🌀",
     color: "#00bfff",
     gradient: "linear-gradient(135deg, #00bfff 0%, #0096ff 100%)",
-    description: "Identifying swaps with extreme turbulence and shallow pools"
+    description: "Identifying swaps with extreme vortex patterns and shallow pools"
   },
   "Treasure Jellyfish": {
     icon: "🐚",
@@ -94,7 +94,7 @@ const typeConfig = {
     gradient: "linear-gradient(135deg, #40e0d0 0%, #20b2aa 100%)",
     description: "Tracking sandwich attacks and front-running patterns"
   },
-  "Standard Transaction": {
+  "Standard Current": {
     icon: "💰",
     color: "#00b894",
     gradient: "linear-gradient(135deg, #00b894 0%, #00a085 100%)",
@@ -104,7 +104,7 @@ const typeConfig = {
 
 // Transaction type row component with arrow navigation
 function TransactionTypeRow({ type, characters, selectedCharacter, onSelectCharacter }) {
-  const config = typeConfig[type] || typeConfig["Standard Transaction"];
+  const config = typeConfig[type] || typeConfig["Standard Current"];
   const [currentIndex, setCurrentIndex] = useState(0);
   
   const goToPrevious = () => {
@@ -496,9 +496,10 @@ function Explore() {
       setLoading(true)
       setError(null)
       console.log(`🚀 Starting transaction fetch from ${selectedChain}...`)
-      const transactions = await fetchAndAnalyzeTransactions(15, selectedChain) // Fetch more for better grouping
+      const transactions = await fetchAndAnalyzeTransactions(105, selectedChain) // Fetch more for better grouping
       const characterList = transactions.map(transactionToCharacter)
-      
+      console.log('transactionToCharacter', transactionToCharacter)
+      console.log('characterList', characterList)
       // Group characters by transaction type
       const grouped = groupCharactersByType(characterList)
       setCharacters(characterList)

@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import fetch from 'node-fetch';
 import { ethers, keccak256, toUtf8Bytes } from 'ethers';
 import FishtankGameStateABI from './abi/FishtankGameState.json';
 import { createCDPClient } from './cdp';
@@ -15,14 +16,20 @@ const PORT = process.env.PORT || 4000;
 app.use(cors());
 app.use(express.json());
 
-// Initialize CDP client
-const cdpClient = createCDPClient(
-  process.env.CDP_API_KEY_ID,
-  process.env.CDP_API_SECRET
-);
+// Initialize CDP client (optional)
+let cdpClient = null;
+try {
+  cdpClient = createCDPClient(
+    process.env.CDP_API_KEY_ID,
+    process.env.CDP_API_SECRET
+  );
+} catch (error) {
+  console.log('⚠️ CDP client not initialized (missing credentials) - Some features will be disabled');
+}
 
-// Blockchain setup
-const provider = new ethers.JsonRpcProvider(process.env.KATANA_RPC);
+// Blockchain setup with fallback values
+const rpcUrl = process.env.KATANA_RPC || 'https://rpc.tatara.katanarpc.com/';
+const provider = new ethers.JsonRpcProvider(rpcUrl);
 
 // Generate random private keys if not provided (for demo purposes)
 const defaultPrivateKey = '0x' + '1'.repeat(64); // Valid format private key for demo
@@ -54,8 +61,11 @@ try {
   ];
 }
 
+// Use fallback contract address if environment variable is missing
+const contractAddress = process.env.FISHTANK_ADDR || '0x467397d1d298c1a4ca9bfe87565ef04486c25c0f';
+
 const fishtankContract = new ethers.Contract(
-  process.env.FISHTANK_ADDR!,
+  contractAddress,
   contractABI,
   reporterWallet
 );
@@ -262,6 +272,175 @@ app.post('/api/fishtank/score/submit', async (req, res) => {
 
 // Coinbase CDP integration endpoints
 
+// GET /api/katana/stats → Test simpler Katana explorer API endpoint
+app.get('/api/katana/stats', async (req, res) => {
+  try {
+    const katanaApiUrl = `https://explorer-tatara-s4atxtv7sq.t.conduit.xyz/api/v2/stats`;
+    
+    console.log(`🗡️ Proxying Katana stats request: ${katanaApiUrl}`);
+    
+    const response = await fetch(katanaApiUrl);
+    console.log(`📡 Katana API response status: ${response.status} ${response.statusText}`);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ Katana API error response: ${errorText}`);
+      throw new Error(`Katana API responded with ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    console.log(`✅ Katana stats API successful:`, data);
+    
+    res.json(data);
+  } catch (error: any) {
+    console.error('❌ Katana stats API proxy error:', error.message);
+    res.status(500).json({ error: 'Failed to fetch Katana stats', details: error.message });
+  }
+});
+
+// GET /api/transactions?limit=10&type=internal&chain=katana → Proxy to Blockscout API to bypass CORS
+app.get('/api/transactions', async (req, res) => {
+  try {
+    const limit = req.query.limit || '10';
+    const type = req.query.type || 'internal'; // 'internal' or 'regular'
+    const chain = req.query.chain || 'ethereum';
+    
+    // Determine the base URL based on chain
+    let baseUrl = 'https://eth.blockscout.com/api/v2';
+    if (chain === 'katana') {
+      // For Katana, we'll use the working Ethereum endpoint as proxy
+      baseUrl = 'https://eth.blockscout.com/api/v2';
+    }
+    
+    // Build the appropriate endpoint
+    let endpoint;
+    if (type === 'internal') {
+      endpoint = `${baseUrl}/internal-transactions`;
+    } else {
+      endpoint = `${baseUrl}/transactions`;
+    }
+    
+    console.log(`🗡️ Proxying Blockscout API request: ${endpoint} (type: ${type}, chain: ${chain})`);
+    
+    const response = await fetch(endpoint, {
+      headers: {
+        'accept': 'application/json'
+      }
+    });
+    console.log(`📡 Blockscout API response status: ${response.status} ${response.statusText}`);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ Blockscout API error response: ${errorText}`);
+      throw new Error(`Blockscout API responded with ${response.status}: ${response.statusText}`);
+    }
+    
+    const data: any = await response.json();
+    console.log(`✅ Blockscout API proxy successful, got ${data.items ? data.items.length : 'unknown'} transactions`);
+    
+    // Extract the items array and limit to requested count
+    let transactionData = data.items || data;
+    const limitNum = parseInt(limit as string);
+    if (Array.isArray(transactionData) && limitNum) {
+      transactionData = transactionData.slice(0, limitNum);
+    }
+    
+    res.json(transactionData);
+  } catch (error: any) {
+    console.error('❌ Blockscout API proxy error:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to fetch transactions from Blockscout', 
+      details: error.message 
+    });
+  }
+});
+
+// Combined transactions endpoint - fetches both regular and internal transactions
+app.get('/api/blockscout-proxy', async (req, res) => {
+  try {
+    const limit = parseInt((req.query.limit as string) || '50');
+    const type = req.query.type || 'combined'; // 'internal', 'regular', or 'combined'
+    const chain = req.query.chain || 'ethereum';
+    
+    // Determine the base URL based on chain
+    let baseUrl = 'https://eth.blockscout.com/api/v2';
+    if (chain === 'katana') {
+      // For Katana, we'll use the working Ethereum endpoint as proxy
+      baseUrl = 'https://eth.blockscout.com/api/v2';
+    }
+    
+    console.log(`🗡️ Fetching ${type} transactions (limit: ${limit}, chain: ${chain})`);
+    
+    let allTransactions: any[] = [];
+    
+    if (type === 'internal' || type === 'combined') {
+      // Fetch internal transactions
+      const internalEndpoint = `${baseUrl}/internal-transactions`;
+      console.log(`🔄 Fetching internal transactions: ${internalEndpoint}`);
+      
+      const internalResponse = await fetch(internalEndpoint, {
+        headers: { 'accept': 'application/json' }
+      });
+      
+      if (internalResponse.ok) {
+        const internalData: any = await internalResponse.json();
+        const internalTxs = (internalData.items || []).map((tx: any) => ({
+          ...tx,
+          transaction_type: 'internal',
+          internal_transaction: true
+        }));
+        allTransactions.push(...internalTxs);
+        console.log(`✅ Fetched ${internalTxs.length} internal transactions`);
+      } else {
+        console.warn(`⚠️ Failed to fetch internal transactions: ${internalResponse.status}`);
+      }
+    }
+    
+    if (type === 'regular' || type === 'combined') {
+      // Fetch regular transactions
+      const regularEndpoint = `${baseUrl}/transactions`;
+      console.log(`🔄 Fetching regular transactions: ${regularEndpoint}`);
+      
+      const regularResponse = await fetch(regularEndpoint, {
+        headers: { 'accept': 'application/json' }
+      });
+      
+      if (regularResponse.ok) {
+        const regularData: any = await regularResponse.json();
+        const regularTxs = (regularData.items || []).map((tx: any) => ({
+          ...tx,
+          transaction_type: 'regular',
+          internal_transaction: false
+        }));
+        allTransactions.push(...regularTxs);
+        console.log(`✅ Fetched ${regularTxs.length} regular transactions`);
+      } else {
+        console.warn(`⚠️ Failed to fetch regular transactions: ${regularResponse.status}`);
+      }
+    }
+    
+    // Shuffle and limit the combined results for variety
+    const shuffledTransactions = allTransactions.sort(() => Math.random() - 0.5);
+    const limitedTransactions = shuffledTransactions.slice(0, limit);
+    
+    console.log(`🎲 Combined and shuffled ${allTransactions.length} total transactions, returning ${limitedTransactions.length}`);
+    
+    res.json({
+      items: limitedTransactions,
+      total_count: allTransactions.length,
+      returned_count: limitedTransactions.length,
+      transaction_types: type === 'combined' ? ['internal', 'regular'] : [type]
+    });
+    
+  } catch (error: any) {
+    console.error('❌ Blockscout API proxy error:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to fetch transactions from Blockscout', 
+      details: error.message 
+    });
+  }
+});
+
 // GET /api/balances?address=0x... → CDP Token Balances (Base)
 app.get('/api/balances', async (req, res) => {
   try {
@@ -277,6 +456,9 @@ app.get('/api/balances', async (req, res) => {
     }
 
     console.log(`Fetching balances for address: ${address}`);
+    if (!cdpClient) {
+      return res.status(503).json({ error: 'CDP service unavailable - missing credentials' });
+    }
     const balances = await cdpClient.getTokenBalances(address, 'base');
     
     res.json(balances);
